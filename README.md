@@ -56,6 +56,7 @@ Tap Share → **WinAirdrop** and the photo pops up on your PC. No cables, no clo
 - [Building from source](#%EF%B8%8F-building-from-source)
 - [API](#-api)
 - [Roadmap](#%EF%B8%8F-roadmap)
+- [Code signing policy](#-code-signing-policy)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -393,6 +394,16 @@ curl -H "Authorization: Bearer $TOKEN" -F file=@photo.jpg -F file=@notes.pdf htt
 - [ ] Transfer progress for large files
 
 Ideas welcome: [open a feature request](https://github.com/josedag31/WinAirdrop/issues/new/choose).
+
+## 🔏 Code signing policy
+
+WinAirdrop releases are built automatically by [GitHub Actions](.github/workflows/release.yml) from the source code in this repository. Nothing is built or uploaded by hand.
+
+- **Committers and reviewers:** [@josedag31](https://github.com/josedag31). Changes proposed by anyone else (pull requests) are reviewed by a committer before merging.
+- **Approvers** (who decide whether a release is signed): [@josedag31](https://github.com/josedag31).
+- Every maintainer uses multi-factor authentication on GitHub.
+
+**Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. WinAirdrop only receives files that you send it from your own devices on your local network, and makes no internet connections.
 
 ## 🤝 Contributing
 
