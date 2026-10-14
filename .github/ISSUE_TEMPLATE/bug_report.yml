@@ -1,0 +1,49 @@
+name: 🐛 Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Never paste your token or your `.env` file here.**
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: WinAirdrop version
+      placeholder: "1.0.0 (shown on http://localhost:8770/setup)"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options: ["WinAirdrop.exe (release)", "From source"]
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+  - type: input
+    id: ios
+    attributes:
+      label: iOS / iPadOS version and device
+      placeholder: "iOS 26.0, iPhone 14"
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network
+      options: ["Home Wi-Fi", "iPhone Personal Hotspot", "Other"]
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant lines from winairdrop.log
+      render: text

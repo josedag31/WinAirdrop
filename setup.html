@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WinAirdrop</title>
+<style>
+  :root { --bg:#f5f5f7; --fg:#1d1d1f; --muted:#6e6e73; --card:#fff; --line:#e2e2e6; --acc:#0a66d8; --acc-bg:#e8f1fd;
+          --ok:#1a7f37; --ok-bg:#e6f4ea; --warn:#9a6700; --warn-bg:#fff4d6; --bad:#c62828; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111113; --fg:#f2f2f4; --muted:#a1a1a8; --card:#1c1c1f; --line:#2f2f34;
+          --acc:#5aa2ff; --acc-bg:#16263d; --ok:#4ac26b; --ok-bg:#132a1b; --warn:#e3b341; --warn-bg:#2d2410; --bad:#ff6b6b; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 system-ui, "Segoe UI", sans-serif; }
+  main { max-width:840px; margin:0 auto; padding:36px 16px 72px; }
+  header { display:flex; align-items:center; gap:14px; margin-bottom:24px; flex-wrap:wrap; }
+  .logo { width:52px; height:52px; border-radius:13px; background:linear-gradient(135deg,#2d8cff,#7b5cff); display:grid; place-items:center; flex:none; }
+  h1 { font-size:26px; margin:0; letter-spacing:-.01em; } .sub { color:var(--muted); font-size:14px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ok); background:var(--ok-bg); border-radius:99px; padding:2px 10px; margin-left:6px; vertical-align:middle; }
+  .pill::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .lang { margin-left:auto; display:flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); }
+  .lang select { width:auto; padding:5px 8px; }
+  h2 { font-size:19px; margin:40px 0 6px; } .intro { color:var(--muted); margin:0 0 14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+  .how { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media (max-width:700px) { .how { grid-template-columns:1fr; } }
+  .how div { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; font-size:14px; color:var(--muted); }
+  .how div b { color:var(--fg); } .how .n { display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%; background:var(--acc-bg); color:var(--acc); font-weight:700; font-size:13px; margin-bottom:6px; }
+  .status { display:flex; gap:10px; align-items:center; padding:12px 16px; border-radius:12px; font-weight:600; margin-bottom:12px; }
+  .status.ok { background:var(--ok-bg); color:var(--ok); } .status.warn { background:var(--warn-bg); color:var(--warn); }
+  .check { padding:14px 0; border-bottom:1px solid var(--line); } .check:last-of-type { border-bottom:0; }
+  .check .head { display:flex; gap:12px; align-items:center; }
+  .dot { width:11px; height:11px; border-radius:50%; background:var(--muted); flex:none; }
+  .ok > .head .dot, .row-net.ok .dot { background:var(--ok); } .warn > .head .dot, .row-net.warn .dot { background:var(--warn); }
+  .check .head .t { flex:1; font-weight:600; } .check .head small { display:block; font-weight:400; color:var(--muted); }
+  .check p { margin:6px 0 0 23px; color:var(--muted); font-size:14px; }
+  .nets { margin:10px 0 0 23px; display:grid; gap:8px; }
+  .row-net { display:flex; gap:10px; align-items:center; background:var(--bg); border-radius:10px; padding:10px 12px; }
+  .row-net .t { flex:1; } .row-net small { display:block; color:var(--muted); }
+  .note { color:var(--muted); font-size:13.5px; margin-top:12px; }
+  .tip { background:var(--acc-bg); border-radius:10px; padding:10px 14px; font-size:14px; margin-top:12px; }
+  button { border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:8px; padding:7px 14px; font:inherit; font-size:14px; cursor:pointer; white-space:nowrap; }
+  button:hover { border-color:var(--acc); color:var(--acc); }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; } button.primary:hover { filter:brightness(1.1); color:#fff; }
+  button.danger:hover { border-color:var(--bad); color:var(--bad); }
+  button:disabled { opacity:.6; cursor:default; }
+  .grid { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:start; }
+  @media (max-width:640px) { .grid { grid-template-columns:1fr; } }
+  .label { font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .val { display:flex; gap:8px; align-items:center; margin:6px 0 2px; }
+  .val code { flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; word-break:break-all; font:13.5px ui-monospace, Consolas, monospace; }
+  .help { color:var(--muted); font-size:13.5px; margin:0 0 14px; }
+  .qr img { border-radius:10px; background:#fff; padding:6px; display:block; margin:6px 0; }
+  details { margin-top:12px; } details > summary { cursor:pointer; font-weight:600; padding:4px 0; }
+  ol.steps { counter-reset:s; list-style:none; padding:0; margin:8px 0 0; }
+  ol.steps > li { counter-increment:s; position:relative; padding:12px 0 12px 42px; border-top:1px solid var(--line); }
+  ol.steps > li::before { content:counter(s); position:absolute; left:0; top:12px; width:26px; height:26px; border-radius:50%; background:var(--acc-bg); color:var(--acc); font-weight:700; font-size:13px; display:grid; place-items:center; }
+  ol.steps ul { margin:6px 0 0; padding-left:18px; }
+  kbd { font:12.5px ui-monospace, Consolas, monospace; background:var(--bg); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
+  form .row { display:grid; grid-template-columns:210px 1fr; gap:6px 18px; padding:14px 0; border-bottom:1px solid var(--line); }
+  form .row:last-of-type { border-bottom:0; }
+  form .row > label { font-weight:600; padding-top:7px; }
+  form .row .field { min-width:0; }
+  form .row .help { margin:6px 0 0; }
+  @media (max-width:640px) { form .row { grid-template-columns:1fr; } form .row > label { padding-top:0; } }
+  input[type=text], input[type=number], select { width:100%; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; }
+  input::placeholder { color:var(--muted); opacity:.7; }
+  input:focus, select:focus { outline:2px solid var(--acc); outline-offset:1px; }
+  .inline { display:flex; gap:8px; } .inline input { flex:1; min-width:0; }
+  .switch { display:flex; align-items:center; gap:10px; padding-top:6px; }
+  input[type=checkbox] { width:18px; height:18px; accent-color:var(--acc); flex:none; }
+  .err { color:var(--bad); font-size:13px; margin-top:4px; }
+  .actions { display:flex; gap:10px; align-items:center; justify-content:flex-end; margin-top:16px; }
+  .banner { display:none; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 16px; padding:12px 16px; border-radius:12px; background:var(--warn-bg); color:var(--warn); font-weight:600; }
+  .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--fg); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90vw; }
+  .toast.show { opacity:1; }
+  a { color:var(--acc); text-decoration:none; } a:hover { text-decoration:underline; }
+  footer { margin-top:40px; color:var(--muted); font-size:13px; }
+  footer code { word-break:break-all; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V9"/><path d="m8 13 4-4 4 4"/><path d="M5.6 6.6a9 9 0 0 1 12.8 0"/></svg>
+    </div>
+    <div>
+      <h1>WinAirdrop <span class="pill" data-i18n="running"></span></h1>
+      <div class="sub"><span data-i18n="subtitle"></span> · <span data-i18n="created_by"></span> <a href="https://github.com/josedag31" target="_blank" rel="noopener noreferrer">josedag31</a></div>
+    </div>
+    <label class="lang"><span data-i18n="language"></span>
+      <select id="lang-top" aria-label="Language"><option value="en">English</option><option value="es">Español</option></select>
+    </label>
+  </header>
+
+  <div class="banner" id="restart-banner"><span data-i18n="restart_banner"></span><button class="primary" id="restart" data-i18n="restart_button"></button></div>
+
+  <section class="how" aria-labelledby="how">
+    <div><span class="n">1</span><br><span data-i18n-html="how_1"></span></div>
+    <div><span class="n">2</span><br><span data-i18n-html="how_2"></span></div>
+    <div><span class="n">3</span><br><span data-i18n-html="how_3"></span></div>
+  </section>
+
+  <h2 data-i18n="s1_title"></h2>
+  <p class="intro" data-i18n="s1_intro"></p>
+  <div class="status warn" id="ready"><span data-i18n="checking"></span></div>
+  <div class="card">
+    <div class="check" id="chk-fw">
+      <div class="head"><span class="dot"></span><div class="t"><span data-i18n="fw_title"></span><small data-i18n="checking"></small></div>
+        <button id="fix-fw" data-i18n="fw_button" hidden></button></div>
+      <p data-i18n-html="fw_desc"></p>
+    </div>
+    <div class="check" id="chk-net">
+      <div class="head"><span class="dot"></span><div class="t"><span data-i18n="net_title"></span><small data-i18n="checking"></small></div></div>
+      <p data-i18n-html="net_desc"></p>
+      <div class="nets" id="net-list"></div>
+    </div>
+    <div class="tip" data-i18n-html="net_hotspot_tip"></div>
+    <div class="note" data-i18n-html="admin_note"></div>
+  </div>
+
+  <h2 data-i18n="s2_title"></h2>
+  <p class="intro" data-i18n-html="s2_intro"></p>
+  <div class="card grid">
+    <div>
+      <div class="label" data-i18n="url_label"></div>
+      <div class="val"><code id="url">{{URL}}</code><button data-copy="url" data-i18n="copy"></button></div>
+      <p class="help" data-i18n="url_help"></p>
+      <div class="label" data-i18n="token_label"></div>
+      <div class="val"><code id="auth">Bearer {{TOKEN}}</code><button data-copy="auth" data-i18n="copy"></button></div>
+      <p class="help" data-i18n="token_help"></p>
+    </div>
+    <div class="qr">
+      <div class="label" data-i18n="qr_label"></div>
+      <img alt="QR" src="data:image/png;base64,{{QR_TOKEN}}" width="180" height="180">
+      <div class="help" style="max-width:180px" data-i18n="qr_help"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <details id="steps">
+      <summary data-i18n="steps_title"></summary>
+      <ol class="steps">
+        <li data-i18n-html="step_1"></li><li data-i18n-html="step_2"></li><li data-i18n-html="step_3"></li>
+        <li data-i18n-html="step_4"></li><li data-i18n-html="step_5"></li><li data-i18n-html="step_6"></li>
+        <li data-i18n-html="step_7"></li><li data-i18n-html="step_8"></li>
+      </ol>
+      <div class="tip" data-i18n-html="steps_icloud"></div>
+      <div class="note" data-i18n-html="steps_warning"></div>
+    </details>
+  </div>
+
+  <h2 data-i18n="s3_title"></h2>
+  <p class="intro" data-i18n-html="s3_intro"></p>
+  <form class="card" id="settings" novalidate>
+    <div class="row">
+      <label for="folder" data-i18n="folder_label"></label>
+      <div class="field">
+        <div class="inline"><input type="text" id="folder" name="folder" data-i18n-ph="folder_ph"><button type="button" id="browse" data-i18n="browse"></button><button type="button" id="open-folder" data-i18n="open"></button></div>
+        <p class="help" data-i18n="folder_help"></p><div class="err" data-err="folder"></div>
+      </div>
+    </div>
+    <div class="row">
+      <label for="on_receive" data-i18n="on_receive_label"></label>
+      <div class="field">
+        <select id="on_receive" name="on_receive">
+          <option value="open" data-i18n="opt_open"></option>
+          <option value="reveal" data-i18n="opt_reveal"></option>
+          <option value="none" data-i18n="opt_none"></option>
+        </select>
+        <p class="help" data-i18n-html="on_receive_help"></p>
+      </div>
+    </div>
+    <div class="row">
+      <label for="rename_by_date" data-i18n="rename_label"></label>
+      <div class="field">
+        <div class="switch"><input type="checkbox" id="rename_by_date" name="rename_by_date"><span data-i18n="rename_desc"></span></div>
+        <p class="help" data-i18n-html="rename_help"></p>
+      </div>
+    </div>
+    <div class="row">
+      <label for="notifications" data-i18n="notif_label"></label>
+      <div class="field"><div class="switch"><input type="checkbox" id="notifications" name="notifications"><span data-i18n="notif_desc"></span></div></div>
+    </div>
+    <div class="row">
+      <label for="startup" data-i18n="startup_label"></label>
+      <div class="field">
+        <div class="switch"><input type="checkbox" id="startup" name="startup"><span data-i18n="startup_desc"></span></div>
+        <p class="help" data-i18n="startup_help"></p>
+      </div>
+    </div>
+    <div class="row">
+      <label for="language" data-i18n="language_label"></label>
+      <div class="field">
+        <select id="language" name="language"><option value="en">English</option><option value="es">Español</option></select>
+        <p class="help" data-i18n="language_help"></p>
+      </div>
+    </div>
+    <details id="advanced">
+      <summary data-i18n="advanced_title"></summary>
+      <p class="help" data-i18n="advanced_intro"></p>
+      <div class="row">
+        <label for="name" data-i18n="name_label"></label>
+        <div class="field">
+          <input type="text" id="name" name="name" spellcheck="false" autocomplete="off" data-i18n-ph="name_ph">
+          <p class="help" data-i18n-html="name_help"></p><div class="err" data-err="name"></div>
+        </div>
+      </div>
+      <div class="row">
+        <label for="port" data-i18n="port_label"></label>
+        <div class="field">
+          <input type="number" id="port" name="port" min="1024" max="65535" placeholder="8770">
+          <p class="help" data-i18n-html="port_help"></p><div class="err" data-err="port"></div>
+        </div>
+      </div>
+    </details>
+    <div class="actions"><button type="submit" class="primary" data-i18n="save"></button></div>
+  </form>
+
+  <h2 data-i18n="sec_title"></h2>
+  <div class="card" style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+    <div><b data-i18n="reset_title"></b><div class="help" style="margin:0" data-i18n="reset_desc"></div></div>
+    <button class="danger" id="reset-token" data-i18n="reset_button"></button>
+  </div>
+
+  <footer>
+    <div>WinAirdrop v{{VERSION}} · © 2026 <a href="https://github.com/josedag31" target="_blank" rel="noopener noreferrer">josedag31</a> · <span data-i18n="footer"></span> <a href="https://github.com/josedag31/WinAirdrop" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+    <div><span data-i18n="config_file"></span> <code>{{CONFIG}}</code></div>
+  </footer>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<script type="application/json" id="initial-settings">{{SETTINGS}}</script>
+<script type="application/json" id="strings">{{STRINGS}}</script>
+<script>
+  const CSRF = "{{CSRF}}";
+  const S = JSON.parse(document.getElementById("strings").textContent);
+  const initial = JSON.parse(document.getElementById("initial-settings").textContent);
+  const $ = id => document.getElementById(id);
+  const form = $("settings");
+  const t = (k, vars) => (S[k] || k).replace(/\{(\w+)\}/g, (_, v) => (vars && v in vars) ? vars[v] : `{${v}}`);
+
+  // Our own translation strings (trusted, may contain simple HTML).
+  document.title = t("title");
+  document.querySelectorAll("[data-i18n]").forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll("[data-i18n-html]").forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => el.placeholder = t(el.dataset.i18nPh));
+
+  function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(el._h); el._h = setTimeout(() => el.classList.remove("show"), 2800); }
+  async function api(path, body) {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF }, body: JSON.stringify(body || {}) });
+    let data = {}; try { data = await r.json(); } catch {}
+    return { ok: r.ok, data };
+  }
+  function fill(s) {
+    for (const k of ["folder", "on_receive", "name", "port", "language"]) form[k].value = s[k];
+    for (const k of ["rename_by_date", "notifications", "startup"]) form[k].checked = s[k];
+    $("lang-top").value = s.language;
+    $("name-preview").textContent = s.name;
+  }
+  fill(initial);
+  if (initial.first_run) $("steps").open = true;
+  form.name.addEventListener("input", () => $("name-preview").textContent = form.name.value.toLowerCase());
+
+  async function save(extra) {
+    document.querySelectorAll("[data-err]").forEach(el => el.textContent = "");
+    const body = { folder: form.folder.value, on_receive: form.on_receive.value, name: form.name.value, port: Number(form.port.value),
+                   language: form.language.value, rename_by_date: form.rename_by_date.checked,
+                   notifications: form.notifications.checked, startup: form.startup.checked, ...extra };
+    const { ok, data } = await api("/api/settings", body);
+    if (!ok) {
+      const errors = data.errors || { _: "generic" };
+      for (const [field, code] of Object.entries(errors)) {
+        const el = document.querySelector(`[data-err="${field}"]`);
+        if (el) { el.textContent = t("err_" + code); if (field === "name" || field === "port") $("advanced").open = true; }
+        else toast(t("err_" + code));
+      }
+      return null;
+    }
+    if (data.settings.language !== initial.language) { location.reload(); return data; }
+    fill(data.settings);
+    toast(t("saved"));
+    if (data.restart_required) $("restart-banner").style.display = "flex";
+    return data;
+  }
+  form.addEventListener("submit", e => { e.preventDefault(); save(); });
+  $("lang-top").addEventListener("change", e => { form.language.value = e.target.value; save({ language: e.target.value }); });
+
+  $("browse").addEventListener("click", async e => {
+    e.target.disabled = true; toast(t("browse_wait"));
+    const { data } = await api("/api/browse");
+    e.target.disabled = false;
+    if (data.path) { form.folder.value = data.path; toast(t("browse_done")); }
+  });
+  $("open-folder").addEventListener("click", () => api("/api/open-folder"));
+
+  $("restart").addEventListener("click", async () => {
+    const port = Number(form.port.value);
+    await api("/api/restart"); toast(t("restarting"));
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      // no-cors: a new port is another origin; a resolved fetch means it's up.
+      try { await fetch(`http://localhost:${port}/ping`, { cache: "no-store", mode: "no-cors" }); location.href = `http://localhost:${port}/setup`; return; } catch {}
+    }
+    toast(t("restart_failed"));
+  });
+
+  $("reset-token").addEventListener("click", async () => {
+    if (!confirm(t("reset_confirm"))) return;
+    await api("/api/reset-token"); location.reload();
+  });
+
+  document.querySelectorAll("button[data-copy]").forEach(b => b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent.trim()); b.textContent = t("copied"); }
+    catch { b.textContent = t("copy_fail"); }
+    setTimeout(() => b.textContent = t("copy"), 1500);
+  }));
+
+  function showStatus(s) {
+    const fw = $("chk-fw"), net = $("chk-net");
+    fw.className = "check " + (s.firewall ? "ok" : "warn");
+    fw.querySelector("small").textContent = s.firewall ? t("fw_ok") : s.firewall === null ? t("fw_unknown") : t("fw_missing");
+    $("fix-fw").hidden = !!s.firewall;
+
+    const nets = s.networks || [], priv = nets.filter(n => n.category !== "Public");
+    net.className = "check " + (priv.length ? "ok" : "warn");
+    net.querySelector("small").textContent = !nets.length ? t("net_none") : priv.length ? t("net_ok") : t("net_noprivate");
+    const list = $("net-list"); list.replaceChildren();
+    for (const n of nets) {
+      // Network names come from the system: always inserted as text, never HTML.
+      const pub = n.category === "Public";
+      const row = document.createElement("div"); row.className = "row-net " + (pub ? "warn" : "ok");
+      const dot = document.createElement("span"); dot.className = "dot";
+      const txt = document.createElement("div"); txt.className = "t"; txt.textContent = n.name;
+      const small = document.createElement("small");
+      small.textContent = pub ? t("net_public") : n.category === "DomainAuthenticated" ? t("net_domain") : t("net_private");
+      txt.append(small); row.append(dot, txt);
+      if (pub) {
+        const b = document.createElement("button"); b.textContent = t("net_trust");
+        b.addEventListener("click", () => { if (confirm(t("net_trust_confirm", { name: n.name }))) fix(n.name, b); });
+        row.append(b);
+      }
+      list.append(row);
+    }
+    const ready = $("ready"), allOk = s.firewall && priv.length;
+    ready.className = "status " + (allOk ? "ok" : "warn");
+    ready.textContent = allOk ? "✓ " + t("ready_all") : t("ready_missing");
+  }
+  async function refresh() { try { showStatus(await (await fetch("/api/status", { cache: "no-store" })).json()); } catch {} }
+  async function fix(network, btn) {
+    btn.disabled = true; toast(t("approve_uac"));
+    const { data } = await api("/api/fix-network", network ? { make_private: network } : {});
+    btn.disabled = false;
+    if (data.ok) { toast(t("done")); showStatus(data); } else toast(t("cancelled"));
+  }
+  $("fix-fw").addEventListener("click", e => fix(null, e.target));
+  refresh();
+</script>
+</body>
+</html>
