@@ -4,3 +4,5 @@ ifaddr==0.2.0
 qrcode[pil]==8.2
 pillow==12.3.0
 python-dotenv==1.2.4
+pystray==0.19.5
+comtypes==1.4.17

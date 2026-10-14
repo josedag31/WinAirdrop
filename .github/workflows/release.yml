@@ -1,7 +1,8 @@
-# Push a vX.Y.Z tag to run the tests, build WinAirdrop.exe, the installer and
-# the portable .zip, and publish them as a GitHub Release:
+# Push a vX.Y.Z tag to run the tests, build WinAirdrop, the installer and the
+# portable .zip, and publish them as a GitHub Release:
 #   git tag v1.0.0
 #   git push origin v1.0.0
+# Tags with a suffix (v1.0.0-rc1) are published as a pre-release.
 name: Release
 
 on:
@@ -27,34 +28,48 @@ jobs:
       - name: Check the tag matches __version__
         shell: pwsh
         run: |
-          # v1.2.3 or a pre-release like v1.2.3-rc1 (published as "Pre-release").
           $tag = "${{ github.ref_name }}".TrimStart("v")
           $code = (Select-String -Path winairdrop.py -Pattern '^__version__ = "(.+)"').Matches[0].Groups[1].Value
           if ($tag.Split("-")[0] -ne $code) { throw "Tag v$tag does not match __version__ $code in winairdrop.py" }
           "VERSION=$tag" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
-      - name: Build WinAirdrop.exe
-        run: >
-          python installer/make_version_info.py ${{ env.VERSION }} build/version_info.txt &&
-          pyinstaller --noconfirm --onefile --noconsole --name WinAirdrop
-          --version-file build/version_info.txt
-          --icon assets/icon.ico --add-data "setup.html;." --add-data "locales;locales"
-          --collect-submodules zeroconf winairdrop.py
+      # --onedir (not --onefile): a onefile .exe unpacks itself to a temp folder
+      # and runs from there on every start, which antivirus programs distrust.
+      - name: Build WinAirdrop
+        shell: pwsh
+        run: |
+          python installer/make_version_info.py $env:VERSION build/version_info.txt
+          pyinstaller --noconfirm --onedir --noconsole --name WinAirdrop `
+            --version-file build/version_info.txt --icon assets/icon.ico `
+            --add-data "setup.html;." --add-data "locales;locales" --add-data "assets/icon.png;assets" `
+            --collect-submodules zeroconf --collect-submodules comtypes --hidden-import pystray._win32 `
+            winairdrop.py
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+
+      - name: Smoke test the build
+        shell: pwsh
+        run: |
+          # The admin entry point must start and parse its arguments (no UI, no server).
+          $p = Start-Process dist\WinAirdrop\WinAirdrop.exe -ArgumentList "--elevated" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "WinAirdrop.exe --elevated exited with $($p.ExitCode)" }
+          foreach ($f in "setup.html", "locales\en.json", "locales\es.json", "assets\icon.png") {
+            if (-not (Test-Path "dist\WinAirdrop\_internal\$f")) { throw "Missing $f in the build" }
+          }
 
       - name: Build installer
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
-          & $iscc /Qp "/DAppVersion=$env:VERSION" "/DSourceExe=..\dist\WinAirdrop.exe" installer\WinAirdrop.iss
+          & $iscc /Qp "/DAppVersion=$env:VERSION" "/DSourceDir=..\dist\WinAirdrop" installer\WinAirdrop.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 
       - name: Package portable zip and checksums
         shell: pwsh
         run: |
           $name = "WinAirdrop-v$env:VERSION-portable"
-          New-Item -ItemType Directory $name | Out-Null
-          Copy-Item dist\WinAirdrop.exe, setup-firewall.ps1, install-startup.ps1, start.ps1, .env.example, README.md, LICENSE $name
+          Copy-Item dist\WinAirdrop $name -Recurse
+          Copy-Item .env.example, README.md, LICENSE $name
           # A .env next to the .exe makes the portable copy keep its settings in its own folder.
           New-Item -ItemType File "$name\.env" | Out-Null
           Compress-Archive -Path "$name\*" -DestinationPath "dist\$name.zip"

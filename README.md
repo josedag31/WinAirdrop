@@ -33,7 +33,7 @@ Tap Share → **WinAirdrop** and the photo pops up on your PC. No cables, no clo
 - 📶 **Works without Wi-Fi**: connect your laptop to your iPhone's **Personal Hotspot** and it still works.
 - 🔎 **Finds your PC automatically** over Bonjour/mDNS (`your-pc.local`). IP changes don't matter.
 - 🗓️ **Smart file names**: photos and videos are saved with their **capture date**, like `Photo 2026-09-19 21.13.20.jpg`, instead of `IMG_5107.jpeg`.
-- 🔔 **Notification with a photo preview** when files arrive.
+- 🔔 **Tray icon and notifications**: a WinAirdrop icon next to the clock shows it's running, opens the settings or the folder, and tells you when files arrive.
 - ⚙️ **Point-and-click settings**: save folder, behaviour, startup, firewall and network checks, all from a settings page. No config files needed.
 - 🔒 **Private by design**: files never leave your local network. Every upload needs a secret token, received programs are never run, and WinAirdrop only accepts connections on private networks.
 - 📱 **iPhone and iPad**: one Shortcut, synced through iCloud.
@@ -88,13 +88,12 @@ That's it. Share something from your iPhone → **WinAirdrop** → it pops up on
 To open the settings later, **open WinAirdrop again from the Start menu**. If it's already running, that brings up the settings page.
 
 > [!NOTE]
-> WinAirdrop is not code-signed (certificates cost money), so **SmartScreen** may warn you: click **More info → Run anyway**.
-> If **Smart App Control** is on, Windows blocks unsigned apps with no way around it. Use [the source version](#%EF%B8%8F-building-from-source) instead.
+> WinAirdrop is new and not code-signed yet, so Windows **SmartScreen** may show a blue/red “Windows protected your PC” screen: click **More info → Run anyway**. Some antivirus programs may also ask about it the first time. See [Windows or my antivirus warns about WinAirdrop](#windows-or-my-antivirus-warns-about-winairdrop).
 
 <details>
 <summary><b>Portable version (no installation)</b></summary>
 
-Download `WinAirdrop-vX.Y.Z-portable.zip`, unzip it to a permanent folder and run `WinAirdrop.exe`. The portable version keeps its settings in a `.env` file inside that folder. `setup-firewall.ps1` and `install-startup.ps1` do what the installer options do.
+Download `WinAirdrop-vX.Y.Z-portable.zip`, unzip it to a permanent folder and run `WinAirdrop.exe`. The portable version keeps its settings in a `.env` file inside that folder. Use the settings page to allow it through the firewall and to start it with Windows.
 </details>
 
 <details>
@@ -159,7 +158,7 @@ Everything can be changed from the **settings page**: open WinAirdrop from the S
 | **Save files to** | `Pictures\WinAirdrop` | Any folder. **Browse…** opens the Windows folder picker |
 | **When files arrive** | Open them on screen | *Open* (like a Mac) · *Show in File Explorer* · *Just save them* |
 | **Smart names** | On | Rename photos and videos by capture date |
-| **Notifications** | On | Toast with a photo preview |
+| **Notifications** | On | Windows notification when files arrive |
 | **Start with Windows** | On (installer) | Run in the background when you sign in |
 | **Language** | Installer choice | English or Spanish: page, notifications, file names |
 | **Network name** | `winairdrop-<computer>` | The iPhone finds the PC as `<name>.local` |
@@ -258,8 +257,8 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 | *"Couldn't convert Rich Text to URL"* | A variable in the URL field | Type the URL by hand, put **Repeat Item** in the form body |
 | Fails on campus or hotel Wi-Fi | **Client isolation**: devices can't see each other | Use your iPhone's hotspot instead |
 | The file doesn't open on screen | It isn't a photo, video, audio, PDF or text file | By design: other types are shown in File Explorer |
-| Windows blocks `WinAirdrop.exe` | **Smart App Control** (unsigned app) | [Run from source](#%EF%B8%8F-building-from-source) |
-| Settings page doesn't load right after start | Still starting (about 15–20 s the first time) | Wait a few seconds and reload |
+| “Windows protected your PC” or an antivirus warning | WinAirdrop is new and not code-signed yet | See [the FAQ](#windows-or-my-antivirus-warns-about-winairdrop) |
+| The settings page says the site can't be reached | WinAirdrop isn't running | Open **WinAirdrop** from the Start menu. Look for its icon next to the clock |
 
 Still stuck? Check `winairdrop.log` (in `%APPDATA%\WinAirdrop`) and [open an issue](https://github.com/josedag31/WinAirdrop/issues/new/choose).
 
@@ -299,6 +298,18 @@ The PC side works with anything that can send an HTTP POST, so an Android automa
 <summary><b>Why can't you give me a ready-made Shortcut file?</b></summary>
 
 Since iOS 15, `.shortcut` files must be signed, and only macOS can sign them. Your URL and token are also personal. Building it yourself takes about 3 minutes.
+</details>
+
+<details id="windows-or-my-antivirus-warns-about-winairdrop">
+<summary><b>Windows or my antivirus warns about WinAirdrop</b></summary>
+
+Windows SmartScreen and antivirus programs are wary of any program that is **new** (few people have downloaded it yet) and **not code-signed** (a paid digital signature that identifies the publisher). WinAirdrop is both, for now. It's not a virus detection.
+
+- **SmartScreen**: click **More info → Run anyway**.
+- **Antivirus**: allow it if it asks. WinAirdrop is built to look as little like malware as possible: no scripts, no PowerShell, a normal program folder instead of a self-extracting file, and admin rights only for the firewall, through the standard Windows prompt.
+- Don't trust a random download: get WinAirdrop only from [this repository's Releases](https://github.com/josedag31/WinAirdrop/releases) and check it against `SHA256SUMS.txt`. The code is all here, and every release is built by GitHub Actions from it.
+
+Code signing is on the [roadmap](#%EF%B8%8F-roadmap); these warnings disappear once releases are signed and the app gains reputation.
 </details>
 
 <details>
@@ -351,9 +362,7 @@ WinAirdrop/
 ├── setup.html             # the settings page (/setup)
 ├── locales/               # English and Spanish texts
 ├── installer/             # Inno Setup script
-├── setup-firewall.ps1     # firewall rules (Private profile only), for portable/source use
-├── install-startup.ps1    # start with Windows, for portable/source use
-├── start.ps1              # start in the background
+├── start.ps1              # start from source in the background
 ├── .env.example           # every setting, documented
 ├── tests/                 # pytest suite (no network needed)
 ├── assets/                # logo and icon
@@ -378,11 +387,10 @@ curl -H "Authorization: Bearer $TOKEN" -F file=@photo.jpg -F file=@notes.pdf htt
 
 ## 🗺️ Roadmap
 
-- [ ] System tray icon (status, open folder, pause, quit)
+- [ ] Code-signed releases (no more SmartScreen warnings)
 - [ ] PC → iPhone transfers
 - [ ] Optional HTTPS with a locally trusted certificate
 - [ ] Transfer progress for large files
-- [ ] Code-signed releases
 
 Ideas welcome: [open a feature request](https://github.com/josedag31/WinAirdrop/issues/new/choose).
 

@@ -24,6 +24,7 @@ import time
 import unicodedata
 import urllib.request
 import webbrowser
+import winreg
 from html import escape
 from pathlib import Path
 
@@ -43,6 +44,8 @@ if FROZEN:
     RESOURCES = Path(getattr(sys, "_MEIPASS", ROOT))
 else:
     ROOT = RESOURCES = Path(__file__).resolve().parent
+# The admin copy (firewall / network tasks) must not create or change any settings.
+ELEVATED = "--elevated" in sys.argv
 
 
 def config_dir() -> Path:
@@ -62,7 +65,7 @@ def config_dir() -> Path:
 CONFIG_DIR = config_dir()
 ENV_FILE = CONFIG_DIR / ".env"
 LOG_FILE = CONFIG_DIR / "winairdrop.log"
-if not ENV_FILE.exists():
+if not ENV_FILE.exists() and not ELEVATED:
     ENV_FILE.write_text("", encoding="utf-8")
 
 
@@ -79,7 +82,8 @@ def apply_installer_language() -> None:
     marker.unlink(missing_ok=True)
 
 
-apply_installer_language()
+if not ELEVATED:
+    apply_installer_language()
 load_dotenv(ENV_FILE, encoding="utf-8")
 
 
@@ -180,7 +184,7 @@ if LANGUAGE not in LANGUAGES:
     LANGUAGE = system_language()
 TOKEN = os.getenv("WINAIRDROP_TOKEN")
 FIRST_RUN = not TOKEN
-if not TOKEN:
+if not TOKEN and not ELEVATED:
     # First run: generate a token and store it in .env (never in the code).
     TOKEN = secrets.token_urlsafe(24)
     set_key(str(ENV_FILE), "WINAIRDROP_TOKEN", TOKEN, quote_mode="never")
@@ -188,7 +192,8 @@ if not TOKEN:
 # Per-process secret for the settings page: blocks cross-site requests (CSRF).
 CSRF = secrets.token_urlsafe(24)
 
-FOLDER.mkdir(parents=True, exist_ok=True)
+if not ELEVATED:
+    FOLDER.mkdir(parents=True, exist_ok=True)
 
 FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 # Names iOS uses that say nothing: internal UUID (Photos app), IMG_1234, or
@@ -197,8 +202,6 @@ IOS_NAME = re.compile(r"[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}|IMG_E
 RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
             *(f"LPT{i}" for i in range(1, 10))}
 VIDEO = {".mov", ".mp4", ".m4v", ".3gp"}
-# Formats a Windows toast can show as a preview image.
-TOAST_IMAGE = {".jpg", ".jpeg", ".png", ".gif", ".bmp"}
 # Only these are opened automatically. Anything else (.exe, .bat, .lnk, Office
 # files with macros...) is shown in File Explorer instead, never run.
 SAFE_TO_OPEN = {
@@ -318,58 +321,23 @@ async def save(read, name: str) -> tuple[Path, int]:
     return target, total
 
 
-# --- Windows integration ------------------------------------------------------------
+# --- Windows integration --------------------------------------------------------------
+# Everything here talks to Windows directly (registry, COM, Win32). No PowerShell:
+# antivirus programs block unknown apps that run scripts, and rightly so.
 
-def powershell_args(script: str, sta: bool = False) -> list[str]:
-    # -EncodedCommand (UTF-16LE base64) avoids every quoting problem with paths.
-    script = "[Console]::OutputEncoding=[Text.Encoding]::UTF8;" + script
-    encoded = base64.b64encode(script.encode("utf-16-le")).decode()
-    return ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-            *(["-STA"] if sta else []), "-EncodedCommand", encoded]
-
-
-def run_ps(script: str, timeout: float = 30, sta: bool = False) -> str:
-    try:
-        # stdin=DEVNULL: under pythonw / the windowed .exe there is no console,
-        # and PowerShell exits immediately if it inherits an invalid stdin.
-        result = subprocess.run(powershell_args(script, sta), capture_output=True, timeout=timeout,
-                                stdin=subprocess.DEVNULL,
-                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        return result.stdout.decode("utf-8", "replace").strip()
-    except (OSError, subprocess.TimeoutExpired) as e:
-        log(f"PowerShell failed: {e}")
-        return ""
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+FW_GROUP = "WinAirdrop"
+NET_CATEGORIES = {0: "Public", 1: "Private", 2: "DomainAuthenticated"}
+TRAY = None  # the icon next to the clock, set in main()
 
 
-def ps_quote(value: str) -> str:
-    return "'" + str(value).replace("'", "''") + "'"
-
-
-def notify(title: str, text: str, image: Path | None = None) -> None:
-    """Windows toast (with a photo preview if given); clicking it opens the folder."""
-    if not NOTIFY:
+def notify(title: str, text: str) -> None:
+    """Windows notification from WinAirdrop's own tray icon."""
+    if not NOTIFY or TRAY is None:
         return
-    preview = ""
-    if image is not None and image.suffix.lower() in TOAST_IMAGE:
-        preview = f'<image placement="hero" src="{escape(image.as_uri())}"/>'
-    xml = (
-        f'<toast activationType="protocol" launch="{escape(FOLDER.as_uri())}">'
-        f'<visual><binding template="ToastGeneric"><text>{escape(title)}</text>'
-        f'<text>{escape(text)}</text>{preview}</binding></visual></toast>'
-    )
-    script = (
-        "[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null;"
-        "[Windows.Data.Xml.Dom.XmlDocument,Windows.Data.Xml.Dom.XmlDocument,ContentType=WindowsRuntime]|Out-Null;"
-        "$x=New-Object Windows.Data.Xml.Dom.XmlDocument;"
-        f"$x.LoadXml({ps_quote(xml)});"
-        "$id='{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe';"
-        "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($id).Show("
-        "[Windows.UI.Notifications.ToastNotification]::new($x))"
-    )
     try:
-        subprocess.Popen(powershell_args(script), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except OSError as e:
+        TRAY.notify(text, title)
+    except Exception as e:
         log(f"Could not show notification: {e}")
 
 
@@ -392,90 +360,236 @@ def present(paths: list[Path]) -> None:
         log(f"Could not show {first.name}: {e}")
 
 
-def launch_command() -> tuple[str, str]:
-    """(program, arguments) that start WinAirdrop silently, for shortcuts."""
+def launch_command() -> list[str]:
+    """Command that starts WinAirdrop silently (for startup and elevation)."""
     if FROZEN:
-        return sys.executable, ""
+        return [sys.executable]
     exe = Path(sys.executable)
     pythonw = exe.with_name("pythonw.exe")
-    return str(pythonw if pythonw.exists() else exe), f'"{Path(__file__).resolve()}"'
+    return [str(pythonw if pythonw.exists() else exe), str(Path(__file__).resolve())]
 
 
-def startup_link() -> Path:
+def legacy_startup_link() -> Path:
     return startup_folder() / "WinAirdrop.lnk"
 
 
+def startup_enabled() -> bool:
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            winreg.QueryValueEx(key, "WinAirdrop")
+            return True
+    except OSError:
+        return legacy_startup_link().exists()
+
+
 def set_startup(enabled: bool) -> bool:
-    link = startup_link()
-    if not enabled:
-        link.unlink(missing_ok=True)
-        return True
-    program, args = launch_command()
-    run_ps(
-        f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut({ps_quote(link)});"
-        f"$s.TargetPath={ps_quote(program)};$s.Arguments={ps_quote(args)};"
-        f"$s.WorkingDirectory={ps_quote(Path(program).parent)};"
-        "$s.Description='WinAirdrop - receive files from your iPhone';$s.Save()"
-    )
-    return link.exists()
+    """Start with Windows via the standard per-user Run registry key."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+            if enabled:
+                winreg.SetValueEx(key, "WinAirdrop", 0, winreg.REG_SZ, subprocess.list2cmdline(launch_command()))
+            else:
+                try:
+                    winreg.DeleteValue(key, "WinAirdrop")
+                except FileNotFoundError:
+                    pass
+        if not enabled:
+            legacy_startup_link().unlink(missing_ok=True)  # from older versions
+    except OSError as e:
+        log(f"Could not change startup: {e}")
+    return startup_enabled() == enabled
+
+
+def com_object(progid: str):
+    import comtypes
+    import comtypes.client
+    comtypes.CoInitialize()  # needed once per thread; harmless if repeated
+    return comtypes.client.CreateObject(progid, dynamic=True)
+
+
+def firewall_ok() -> bool | None:
+    """Are WinAirdrop's inbound rules (TCP port + mDNS, Private profile) there?"""
+    try:
+        found = set()
+        for rule in com_object("HNetCfg.FwPolicy2").Rules:
+            if rule.Grouping == FW_GROUP and rule.Enabled and rule.Direction == 1 \
+                    and rule.Action == 1 and rule.Profiles & 2:
+                found.add((rule.Protocol, str(rule.LocalPorts)))
+        return (6, str(PORT)) in found and (17, "5353") in found
+    except Exception as e:
+        log(f"Could not read the firewall: {e}")
+        return None
+
+
+def connected_networks() -> list[dict]:
+    try:
+        nlm = com_object("{DCB00C01-570F-4A9B-8D69-199FDBA5723B}")  # Network List Manager
+        return [{"name": str(net.GetName()), "category": NET_CATEGORIES.get(net.GetCategory(), "Public")}
+                for net in nlm.GetNetworks(1)]  # 1 = connected networks
+    except Exception as e:
+        log(f"Could not read the networks: {e}")
+        return []
 
 
 def system_status() -> dict:
-    """Firewall rules and network profiles (read-only, no admin needed)."""
-    out = run_ps(
-        "$fw=@(Get-NetFirewallRule -Group 'WinAirdrop' -ErrorAction SilentlyContinue | Where-Object Enabled -eq 'True').Count;"
-        "$net=@(Get-NetConnectionProfile -ErrorAction SilentlyContinue | ForEach-Object {"
-        "  [pscustomobject]@{name=[string]$_.Name; category=[string]$_.NetworkCategory} });"
-        "[pscustomobject]@{firewall=$fw; networks=$net} | ConvertTo-Json -Compress -Depth 3"
-    )
+    return {"firewall": firewall_ok(), "networks": connected_networks()}
+
+
+# Admin tasks run in a second copy of WinAirdrop started with admin rights
+# (the Windows prompt shows "WinAirdrop", not a script host).
+
+def add_firewall_rules(port: int) -> None:
+    policy = com_object("HNetCfg.FwPolicy2")
+    remove_firewall_rules(policy)
+    for name, protocol, ports in ((f"WinAirdrop (TCP {port})", 6, str(port)), ("WinAirdrop (mDNS)", 17, "5353")):
+        rule = com_object("HNetCfg.FWRule")
+        rule.Name = name
+        rule.Grouping = FW_GROUP
+        rule.Description = "Lets your iPhone send files to WinAirdrop. Private networks only."
+        rule.Protocol = protocol  # must be set before the ports
+        rule.LocalPorts = ports
+        rule.Direction = 1  # inbound
+        rule.Action = 1  # allow
+        rule.Profiles = 2  # Private only
+        rule.Enabled = True
+        policy.Rules.Add(rule)
+
+
+def remove_firewall_rules(policy=None) -> None:
+    policy = policy or com_object("HNetCfg.FwPolicy2")
+    for name in [r.Name for r in policy.Rules if r.Grouping == FW_GROUP]:
+        policy.Rules.Remove(name)
+
+
+def make_network_private(name: str) -> bool:
+    nlm = com_object("{DCB00C01-570F-4A9B-8D69-199FDBA5723B}")
+    for net in nlm.GetNetworks(1):
+        if str(net.GetName()) == name:
+            net.SetCategory(1)  # Private
+            return True
+    return False
+
+
+def elevated_main(argv: list[str]) -> int:
+    """Entry point of the admin copy: WinAirdrop --elevated [--firewall PORT]
+    [--remove-firewall] [--private NAME]."""
+    import argparse
+    parser = argparse.ArgumentParser(prog="WinAirdrop --elevated")
+    parser.add_argument("--firewall", type=valid_port)
+    parser.add_argument("--remove-firewall", action="store_true")
+    parser.add_argument("--private")
+    args = parser.parse_args(argv)
     try:
-        data = json.loads(out)
-    except ValueError:
-        return {"firewall": None, "networks": []}
-    networks = data.get("networks") or []
-    if isinstance(networks, dict):
-        networks = [networks]
-    return {"firewall": (data.get("firewall") or 0) >= 2, "networks": networks}
+        if args.remove_firewall:
+            remove_firewall_rules()
+        if args.firewall:
+            add_firewall_rules(args.firewall)
+        if args.private and not make_network_private(args.private):
+            return 2
+        return 0
+    except Exception as e:
+        log(f"Admin task failed: {e}")
+        return 1
+
+
+def run_elevated(args: list[str]) -> bool:
+    """Run WinAirdrop with admin rights (UAC prompt) and wait for it."""
+    import ctypes
+    from ctypes import wintypes
+
+    class SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("fMask", ctypes.c_ulong), ("hwnd", wintypes.HWND),
+                    ("lpVerb", wintypes.LPCWSTR), ("lpFile", wintypes.LPCWSTR), ("lpParameters", wintypes.LPCWSTR),
+                    ("lpDirectory", wintypes.LPCWSTR), ("nShow", ctypes.c_int), ("hInstApp", wintypes.HINSTANCE),
+                    ("lpIDList", ctypes.c_void_p), ("lpClass", wintypes.LPCWSTR), ("hkeyClass", wintypes.HKEY),
+                    ("dwHotKey", wintypes.DWORD), ("hIconOrMonitor", wintypes.HANDLE), ("hProcess", wintypes.HANDLE)]
+
+    command = launch_command() + ["--elevated", *args]
+    info = SHELLEXECUTEINFOW()
+    info.cbSize = ctypes.sizeof(info)
+    info.fMask = 0x00000040  # SEE_MASK_NOCLOSEPROCESS
+    info.lpVerb = "runas"
+    info.lpFile = command[0]
+    info.lpParameters = subprocess.list2cmdline(command[1:])
+    info.lpDirectory = str(ROOT)
+    info.nShow = 0  # hidden
+    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(info)) or not info.hProcess:
+        return False  # the user said "No" to the prompt
+    kernel32 = ctypes.windll.kernel32
+    kernel32.WaitForSingleObject(info.hProcess, 120_000)
+    code = wintypes.DWORD()
+    kernel32.GetExitCodeProcess(info.hProcess, ctypes.byref(code))
+    kernel32.CloseHandle(info.hProcess)
+    return code.value == 0
 
 
 def fix_network(make_private: str | None = None) -> bool:
     """Firewall rules (Private profile only) and, optionally, mark ONE network
-    (chosen by the user, by name) as Private. Needs admin: Windows shows a UAC
-    prompt. Never touches the other networks, e.g. a café Wi-Fi."""
-    inner = (
-        "$g='WinAirdrop';"
-        "Get-NetFirewallRule -Group $g -ErrorAction SilentlyContinue | Remove-NetFirewallRule;"
-        f"New-NetFirewallRule -Group $g -DisplayName 'WinAirdrop (TCP {PORT})' -Direction Inbound "
-        f"-Protocol TCP -LocalPort {PORT} -Action Allow -Profile Private | Out-Null;"
-        "New-NetFirewallRule -Group $g -DisplayName 'WinAirdrop (mDNS)' -Direction Inbound "
-        "-Protocol UDP -LocalPort 5353 -Action Allow -Profile Private | Out-Null;"
-    )
+    (chosen by the user, by name) as Private. Never touches the other networks,
+    e.g. a café Wi-Fi."""
+    args = ["--firewall", str(PORT)]
     if make_private:
-        inner += (f"Get-NetConnectionProfile | Where-Object {{ $_.Name -eq {ps_quote(make_private)} }} | "
-                  "Set-NetConnectionProfile -NetworkCategory Private;")
-    encoded = base64.b64encode(inner.encode("utf-16-le")).decode()
-    out = run_ps(
-        "try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
-        f"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','{encoded}'; 'ok' }} "
-        "catch { 'cancelled' }",
-        timeout=180,
-    )
-    return out.endswith("ok")
+        args += ["--private", make_private]
+    return run_elevated(args)
 
 
 def pick_folder(current: Path) -> str | None:
-    """Native folder picker, shown on top of the browser."""
-    out = run_ps(
-        "Add-Type -AssemblyName System.Windows.Forms;"
-        "$d=New-Object System.Windows.Forms.FolderBrowserDialog;"
-        "$d.Description='Where should WinAirdrop save received files?';"
-        "$d.ShowNewFolderButton=$true;"
-        f"$d.SelectedPath={ps_quote(current)};"
-        "$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true};"
-        "if($d.ShowDialog($o) -eq 'OK'){[Console]::Out.Write($d.SelectedPath)}",
-        timeout=600, sta=True,
-    )
-    return out or None
+    """Native Windows folder picker, shown on top of the browser."""
+    import ctypes
+    from ctypes import wintypes
+
+    callback_type = ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HWND, wintypes.UINT, wintypes.LPARAM, wintypes.LPARAM)
+
+    class BROWSEINFOW(ctypes.Structure):
+        _fields_ = [("hwndOwner", wintypes.HWND), ("pidlRoot", ctypes.c_void_p), ("pszDisplayName", wintypes.LPWSTR),
+                    ("lpszTitle", wintypes.LPCWSTR), ("ulFlags", wintypes.UINT), ("lpfn", callback_type),
+                    ("lParam", wintypes.LPARAM), ("iImage", ctypes.c_int)]
+
+    user32, shell32, ole32 = ctypes.windll.user32, ctypes.windll.shell32, ctypes.windll.ole32
+    user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    shell32.SHBrowseForFolderW.restype = ctypes.c_void_p
+    shell32.SHGetPathFromIDListW.argtypes = [ctypes.c_void_p, wintypes.LPWSTR]
+    start = ctypes.create_unicode_buffer(str(current))
+
+    def on_event(hwnd, message, lparam, data):
+        if message == 1:  # BFFM_INITIALIZED: preselect the current folder, bring to front
+            user32.SendMessageW(hwnd, 0x0467, 1, ctypes.addressof(start))  # BFFM_SETSELECTIONW
+            user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0003)  # HWND_TOPMOST, no move/size
+            user32.SetForegroundWindow(hwnd)
+        return 0
+
+    callback = callback_type(on_event)  # keep a reference while the dialog is open
+    ole32.CoInitializeEx(None, 0x2)  # the new-style dialog needs a single-threaded apartment
+    display = ctypes.create_unicode_buffer(260)
+    info = BROWSEINFOW(None, None, ctypes.cast(display, wintypes.LPWSTR), t("pick_folder"),
+                       0x0001 | 0x0040, callback, 0, 0)  # BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
+    pidl = shell32.SHBrowseForFolderW(ctypes.byref(info))
+    if not pidl:
+        return None
+    path = ctypes.create_unicode_buffer(32768)
+    ok = shell32.SHGetPathFromIDListW(pidl, path)
+    ole32.CoTaskMemFree(ctypes.c_void_p(pidl))
+    return path.value if ok else None
+
+
+def start_tray(on_quit) -> object | None:
+    """Icon next to the clock: shows WinAirdrop is running, opens the settings,
+    the folder, or quits. Also the source of the notifications."""
+    try:
+        import pystray
+        image = Image.open(RESOURCES / "assets" / "icon.png")
+        menu = pystray.Menu(
+            pystray.MenuItem(lambda item: t("tray_settings"), lambda: webbrowser.open(setup_url()), default=True),
+            pystray.MenuItem(lambda item: t("tray_folder"), lambda: os.startfile(FOLDER)),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(lambda item: t("tray_quit"), lambda icon: (icon.stop(), on_quit())),
+        )
+        icon = pystray.Icon("WinAirdrop", image, "WinAirdrop", menu)
+        icon.run_detached()
+        return icon
+    except Exception as e:
+        log(f"No tray icon: {e}")
+        return None
 
 
 # --- Network --------------------------------------------------------------------------
@@ -526,7 +640,7 @@ async def upload(request: web.Request) -> web.Response:
         log(f"Received {path.name} ({size / 1e6:.2f} MB) from {request.remote}")
     paths = [p for p, _ in saved]
     text = t("received_one", name=paths[0].name) if len(paths) == 1 else t("received_many", n=len(paths))
-    notify("WinAirdrop", text, image=paths[0])
+    notify("WinAirdrop", text)
     present(paths)
     return web.json_response({"ok": True, "files": [p.name for p in paths]})
 
@@ -592,7 +706,7 @@ def current_settings() -> dict:
         "name": NAME,
         "port": PORT,
         "language": LANGUAGE,
-        "startup": startup_link().exists(),
+        "startup": startup_enabled(),
         "first_run": FIRST_RUN,
     }
 
@@ -685,7 +799,7 @@ async def api_settings(request: web.Request) -> web.Response:
     write_setting("WINAIRDROP_NAME", name)
     write_setting("WINAIRDROP_PORT", str(port))
 
-    if "startup" in data and bool(data["startup"]) != startup_link().exists():
+    if "startup" in data and bool(data["startup"]) != startup_enabled():
         await asyncio.to_thread(set_startup, bool(data["startup"]))
 
     restart = name != NAME or port != PORT
@@ -727,8 +841,7 @@ async def api_reset_token(request: web.Request) -> web.Response:
 
 def relaunch() -> None:
     """Start a fresh copy (it waits for the port) and quit this one."""
-    program, args = launch_command()
-    cmd = [program] + ([str(Path(__file__).resolve())] if not FROZEN else [])
+    cmd = launch_command()
     # Drop the WINAIRDROP_* values this process loaded, so the new one reads .env.
     env = {k: v for k, v in os.environ.items() if not k.startswith("WINAIRDROP_")}
     env["WINAIRDROP_RELAUNCH"] = "1"
@@ -820,6 +933,14 @@ class Announcer:
 
 # --- Main -----------------------------------------------------------------------------
 
+def message_box(title: str, text: str) -> None:
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, text, title, 0x30)  # warning icon
+    except Exception:
+        pass
+
+
 def setup_url() -> str:
     return f"http://localhost:{PORT}/setup"
 
@@ -855,25 +976,35 @@ async def main() -> int:
             webbrowser.open(setup_url())
             return 0
         log(f"Port {PORT} is used by another program. Change WINAIRDROP_PORT in {ENV_FILE}.")
-        notify(t("port_busy_title"), t("port_busy_text", port=PORT))
+        message_box(t("port_busy_title"), t("port_busy_text", port=PORT))
         return 1
     log(f"WinAirdrop {__version__} listening on port {PORT}. Files -> {FOLDER}")
     log(f"Settings: {setup_url()}")
     if FIRST_RUN or not os.getenv("WINAIRDROP_RELAUNCH") and "--settings" in sys.argv:
         webbrowser.open(setup_url())
 
+    global TRAY
+    loop = asyncio.get_running_loop()
+    quit_requested = asyncio.Event()
+    TRAY = start_tray(lambda: loop.call_soon_threadsafe(quit_requested.set))
+
     announcer = Announcer()
+    watcher = asyncio.create_task(announcer.watch())
     try:
-        await announcer.watch()
+        await quit_requested.wait()
     finally:
+        watcher.cancel()
         await announcer.close()
         await runner.cleanup()
+    log("WinAirdrop closed from the tray icon.")
     return 0
 
 
 if __name__ == "__main__":
     if sys.stdout is None:  # pythonw / windowed .exe: no console, log to file
         sys.stdout = sys.stderr = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+    if ELEVATED:
+        sys.exit(elevated_main(sys.argv[sys.argv.index("--elevated") + 1:]))
     try:
         sys.exit(asyncio.run(main()))
     except KeyboardInterrupt:

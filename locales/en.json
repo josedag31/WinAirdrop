@@ -5,7 +5,11 @@
     "received_one": "Received {name}",
     "received_many": "Received {n} files",
     "port_busy_title": "WinAirdrop can't start",
-    "port_busy_text": "Port {port} is used by another program. Change the port in WinAirdrop's settings file."
+    "port_busy_text": "Port {port} is used by another program, so WinAirdrop can't receive files.\n\nChange WINAIRDROP_PORT in WinAirdrop's settings file (.env) or close the other program, then open WinAirdrop again.",
+    "pick_folder": "Where should WinAirdrop save the files you send?",
+    "tray_settings": "Open settings",
+    "tray_folder": "Open received files",
+    "tray_quit": "Quit WinAirdrop"
   },
   "page": {
     "title": "WinAirdrop Settings",
@@ -84,7 +88,7 @@
     "rename_desc": "Name photos and videos by the date they were taken",
     "rename_help": "Instead of <kbd>IMG_5107.jpg</kbd> you get <kbd>Photo 2026-09-19 21.13.20.jpg</kbd>, so they sort by date. Other files keep their name.",
     "notif_label": "Notifications",
-    "notif_desc": "Show a notification with a preview when something arrives",
+    "notif_desc": "Show a Windows notification when something arrives",
     "startup_label": "Start with Windows",
     "startup_desc": "Run WinAirdrop in the background when I sign in (recommended)",
     "startup_help": "If it's off, your iPhone can't send anything until you open WinAirdrop yourself.",

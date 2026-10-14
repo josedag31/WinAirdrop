@@ -12,7 +12,7 @@ First public release.
 ### Added
 - Receive any file from iPhone/iPad through an iOS Shortcut in the Share Sheet.
 - Received files open on screen like AirDrop on a Mac (photos, videos, audio, PDF, text); several files are shown in File Explorer.
-- Notification with a photo preview.
+- Tray icon next to the clock (open settings, open folder, quit) and Windows notifications.
 - Settings page: save folder (with a folder picker), on-receive behaviour, smart names, notifications, start with Windows, network name and port, with firewall and network checks and one-click fixes.
 - Installer (per-user, no admin rights except the optional firewall step) and portable `.zip`.
 - Automatic discovery over mDNS (`<name>.local`) on every real network adapter, re-announced when the network changes (home Wi-Fi ↔ Personal Hotspot).

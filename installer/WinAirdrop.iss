@@ -1,6 +1,6 @@
 ﻿; Inno Setup script for WinAirdrop.
 ; Built by .github/workflows/release.yml:
-;   ISCC.exe /DAppVersion=1.0.0 /DSourceExe=..\dist\WinAirdrop.exe installer\WinAirdrop.iss
+;   ISCC.exe /DAppVersion=1.0.0 /DSourceDir=..\dist\WinAirdrop installer\WinAirdrop.iss
 ;
 ; Per-user install (no admin rights needed) into %LOCALAPPDATA%\Programs\WinAirdrop.
 ; Only the optional firewall step asks for administrator permission.
@@ -10,8 +10,9 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
-#ifndef SourceExe
-  #define SourceExe "..\dist\WinAirdrop.exe"
+#ifndef SourceDir
+  ; PyInstaller --onedir output: WinAirdrop.exe + _internal\
+  #define SourceDir "..\dist\WinAirdrop"
 #endif
 
 [Setup]
@@ -78,34 +79,47 @@ Name: "startup"; Description: "{cm:TaskStartup}"; GroupDescription: "{cm:TaskSta
 Name: "firewall"; Description: "{cm:TaskFirewall}"; GroupDescription: "{cm:TaskFirewallHelp}"
 
 [Files]
-Source: "{#SourceExe}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\WinAirdrop"; Filename: "{app}\WinAirdrop.exe"; Comment: "{cm:ShortcutComment}"
-Name: "{userstartup}\WinAirdrop"; Filename: "{app}\WinAirdrop.exe"; Tasks: startup
+
+[Registry]
+; Start with Windows: the standard per-user Run key (the settings page uses the same value).
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; \
+  ValueName: "WinAirdrop"; ValueData: """{app}\WinAirdrop.exe"""; Tasks: startup; Flags: uninsdeletevalue
+
+[InstallDelete]
+; Startup shortcut from older versions (now the Run key is used).
+Type: files; Name: "{userstartup}\WinAirdrop.lnk"
 
 [Run]
-; Firewall rules on the Private profile only. ShellExec + runas shows a UAC prompt.
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""Get-NetFirewallRule -Group 'WinAirdrop' -ErrorAction SilentlyContinue | Remove-NetFirewallRule; New-NetFirewallRule -Group 'WinAirdrop' -DisplayName 'WinAirdrop (TCP 8770)' -Direction Inbound -Protocol TCP -LocalPort 8770 -Action Allow -Profile Private | Out-Null; New-NetFirewallRule -Group 'WinAirdrop' -DisplayName 'WinAirdrop (mDNS)' -Direction Inbound -Protocol UDP -LocalPort 5353 -Action Allow -Profile Private | Out-Null"""; \
-  Verb: "runas"; Flags: shellexec waituntilterminated runhidden; Tasks: firewall; \
+; Firewall rules on the Private profile only, added by WinAirdrop itself.
+; ShellExec + runas shows a UAC prompt that says "WinAirdrop".
+Filename: "{app}\WinAirdrop.exe"; Parameters: "--elevated --firewall 8770"; \
+  Verb: "runas"; Flags: shellexec waituntilterminated; Tasks: firewall; \
   StatusMsg: "{cm:FirewallStatus}"
 ; First start opens the settings page in the browser automatically.
 Filename: "{app}\WinAirdrop.exe"; Description: "{cm:RunNow}"; Flags: nowait postinstall
 
 [UninstallRun]
 Filename: "taskkill.exe"; Parameters: "/F /IM WinAirdrop.exe"; Flags: runhidden; RunOnceId: "StopWinAirdrop"
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""Get-NetFirewallRule -Group 'WinAirdrop' -ErrorAction SilentlyContinue | Remove-NetFirewallRule"""; \
-  Verb: "runas"; Flags: shellexec waituntilterminated runhidden; RunOnceId: "RemoveFirewall"
+Filename: "{app}\WinAirdrop.exe"; Parameters: "--elevated --remove-firewall"; \
+  Verb: "runas"; Flags: shellexec waituntilterminated; RunOnceId: "RemoveFirewall"
 
 [UninstallDelete]
-; Shortcut created from the settings page ("Start with Windows"), if any.
 Type: files; Name: "{userstartup}\WinAirdrop.lnk"
 
 [Code]
+{ "Start with Windows" may also have been turned on from the settings page. }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WinAirdrop');
+end;
+
 { Leave the setup language ("en" or "es", plain ASCII) for WinAirdrop. On its
   next start it saves it as WINAIRDROP_LANGUAGE in its .env and deletes this
   file. The .env itself (settings and token) is never touched by the setup. }

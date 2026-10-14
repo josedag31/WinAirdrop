@@ -5,7 +5,11 @@
     "received_one": "Recibido: {name}",
     "received_many": "{n} archivos recibidos",
     "port_busy_title": "WinAirdrop no puede arrancar",
-    "port_busy_text": "Otro programa está usando el puerto {port}. Cambia el puerto en el fichero de ajustes de WinAirdrop."
+    "port_busy_text": "Otro programa está usando el puerto {port}, así que WinAirdrop no puede recibir archivos.\n\nCambia WINAIRDROP_PORT en el fichero de ajustes de WinAirdrop (.env) o cierra el otro programa, y vuelve a abrir WinAirdrop.",
+    "pick_folder": "¿Dónde quieres que WinAirdrop guarde los archivos que envíes?",
+    "tray_settings": "Abrir ajustes",
+    "tray_folder": "Abrir archivos recibidos",
+    "tray_quit": "Salir de WinAirdrop"
   },
   "page": {
     "title": "Ajustes de WinAirdrop",
@@ -84,7 +88,7 @@
     "rename_desc": "Poner a las fotos y vídeos la fecha en que se hicieron",
     "rename_help": "En vez de <kbd>IMG_5107.jpg</kbd> tendrás <kbd>Foto 2026-09-19 21.13.20.jpg</kbd>, así se ordenan por fecha. Los demás archivos conservan su nombre.",
     "notif_label": "Notificaciones",
-    "notif_desc": "Mostrar una notificación con vista previa al recibir algo",
+    "notif_desc": "Mostrar una notificación de Windows al recibir algo",
     "startup_label": "Arrancar con Windows",
     "startup_desc": "Ejecutar WinAirdrop en segundo plano al iniciar sesión (recomendado)",
     "startup_help": "Si lo desactivas, tu iPhone no podrá mandar nada hasta que abras WinAirdrop tú mismo.",

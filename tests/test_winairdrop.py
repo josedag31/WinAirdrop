@@ -302,6 +302,56 @@ async def test_language_change_is_saved(local, monkeypatch):
     assert '<html lang="es">' in page and "Ajustes de WinAirdrop" in page
 
 
+# --- Windows integration (no PowerShell) ----------------------------------------------
+
+def test_no_powershell_anywhere():
+    # Antivirus programs block unknown apps that run PowerShell.
+    import re
+    calls = re.compile(r"""["'=]\s*powershell(\.exe)?\b|EncodedCommand|-ExecutionPolicy""", re.I)
+    for path in [w.ROOT / "winairdrop.py", w.ROOT / "installer" / "WinAirdrop.iss"]:
+        assert not calls.search(path.read_text(encoding="utf-8-sig")), path.name
+
+
+def test_startup_uses_the_run_key(monkeypatch):
+    key = r"Software\WinAirdropTests\Run"
+    w.winreg.CreateKey(w.winreg.HKEY_CURRENT_USER, key)
+    monkeypatch.setattr(w, "RUN_KEY", key)
+    monkeypatch.setattr(w, "legacy_startup_link", lambda: Path("Z:/does/not/exist.lnk"))
+    try:
+        assert w.set_startup(True) and w.startup_enabled()
+        with w.winreg.OpenKey(w.winreg.HKEY_CURRENT_USER, key) as k:
+            value = w.winreg.QueryValueEx(k, "WinAirdrop")[0]
+        assert "winairdrop.py" in value
+        assert w.set_startup(False) and not w.startup_enabled()
+    finally:
+        w.winreg.DeleteKey(w.winreg.HKEY_CURRENT_USER, key)
+        w.winreg.DeleteKey(w.winreg.HKEY_CURRENT_USER, r"Software\WinAirdropTests")
+
+
+def test_system_status_reads_windows_directly():
+    status = w.system_status()  # read-only COM calls, no admin needed
+    assert status["firewall"] in (True, False)
+    assert all(n["category"] in ("Public", "Private", "DomainAuthenticated") for n in status["networks"])
+
+
+def test_elevated_tasks(monkeypatch):
+    calls = []
+    monkeypatch.setattr(w, "add_firewall_rules", lambda port: calls.append(("fw", port)))
+    monkeypatch.setattr(w, "remove_firewall_rules", lambda: calls.append(("rm",)))
+    monkeypatch.setattr(w, "make_network_private", lambda name: calls.append(("net", name)) or name == "Home")
+    assert w.elevated_main(["--firewall", "8770", "--private", "Home"]) == 0
+    assert calls == [("fw", 8770), ("net", "Home")]
+    assert w.elevated_main(["--private", "Nope"]) == 2
+    assert w.elevated_main(["--remove-firewall"]) == 0 and calls[-1] == ("rm",)
+
+
+def test_fix_network_runs_winairdrop_elevated(monkeypatch):
+    seen = []
+    monkeypatch.setattr(w, "run_elevated", lambda args: seen.append(args) or True)
+    assert w.fix_network("Home")
+    assert seen == [["--firewall", str(w.PORT), "--private", "Home"]]
+
+
 async def test_reset_token(local):
     old = w.TOKEN
     r = await local.post("/api/reset-token", headers=csrf_headers(local))
