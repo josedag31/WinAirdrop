@@ -279,17 +279,23 @@ def test_spanish_file_names(tmp_path, monkeypatch):
     assert w.t("received_many", n=3) == "3 archivos recibidos"
 
 
-def test_installer_language_is_applied_once(tmp_path, monkeypatch):
-    env = tmp_path / ".env"
-    env.write_text("WINAIRDROP_TOKEN=keep-me\nWINAIRDROP_FOLDER='C:/Fotos ñ'\n", encoding="utf-8")
-    (tmp_path / "installer-language").write_text("es", encoding="ascii")
-    monkeypatch.setattr(w, "CONFIG_DIR", tmp_path)
-    monkeypatch.setattr(w, "ENV_FILE", env)
-    w.apply_installer_language()
-    values = dotenv_values(env)
-    assert values["WINAIRDROP_LANGUAGE"] == "es"
-    assert values["WINAIRDROP_TOKEN"] == "keep-me" and values["WINAIRDROP_FOLDER"] == "C:/Fotos ñ"
-    assert not (tmp_path / "installer-language").exists()
+def test_installer_language_from_registry(monkeypatch):
+    key = r"Software\WinAirdropTests\Lang"
+    w.winreg.CreateKey(w.winreg.HKEY_CURRENT_USER, key)
+    try:
+        with w.winreg.OpenKey(w.winreg.HKEY_CURRENT_USER, key, 0, w.winreg.KEY_SET_VALUE) as k:
+            w.winreg.SetValueEx(k, "Language", 0, w.winreg.REG_SZ, "es")
+        real_open = w.winreg.OpenKey
+        monkeypatch.setattr(w.winreg, "OpenKey", lambda root, sub, *a: real_open(root, key if "josedag31" in sub else sub, *a))
+        assert w.installer_language() == "es"
+    finally:
+        w.winreg.DeleteKey(w.winreg.HKEY_CURRENT_USER, key)
+        w.winreg.DeleteKey(w.winreg.HKEY_CURRENT_USER, r"Software\WinAirdropTests")
+
+
+def test_uninstall_never_fails(monkeypatch):
+    monkeypatch.setattr(w, "com_object", lambda progid: (_ for _ in ()).throw(OSError("no COM")))
+    assert w.uninstall_main() == 0
 
 
 async def test_language_change_is_saved(local, monkeypatch):
@@ -308,7 +314,7 @@ def test_no_powershell_anywhere():
     # Antivirus programs block unknown apps that run PowerShell.
     import re
     calls = re.compile(r"""["'=]\s*powershell(\.exe)?\b|EncodedCommand|-ExecutionPolicy""", re.I)
-    for path in [w.ROOT / "winairdrop.py", w.ROOT / "installer" / "WinAirdrop.iss"]:
+    for path in [w.ROOT / "winairdrop.py", w.ROOT / "installer" / "WinAirdrop.wxs"]:
         assert not calls.search(path.read_text(encoding="utf-8-sig")), path.name
 
 

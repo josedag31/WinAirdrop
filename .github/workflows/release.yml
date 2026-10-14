@@ -1,8 +1,9 @@
-# Push a vX.Y.Z tag to run the tests, build WinAirdrop, the installer and the
-# portable .zip, and publish them as a GitHub Release:
-#   git tag v1.0.0
-#   git push origin v1.0.0
-# Tags with a suffix (v1.0.0-rc1) are published as a pre-release.
+# Push a vX.Y.Z tag to run the tests, build WinAirdrop, the two installers
+# (English / Español MSI) and the portable .zip, test the installer for real,
+# and publish everything as a GitHub Release:
+#   git tag v1.0.1
+#   git push origin v1.0.1
+# Tags with a suffix (v1.0.1-rc1) are published as a pre-release.
 name: Release
 
 on:
@@ -32,6 +33,7 @@ jobs:
           $code = (Select-String -Path winairdrop.py -Pattern '^__version__ = "(.+)"').Matches[0].Groups[1].Value
           if ($tag.Split("-")[0] -ne $code) { throw "Tag v$tag does not match __version__ $code in winairdrop.py" }
           "VERSION=$tag" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "MSI_VERSION=$code" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       # --onedir (not --onefile): a onefile .exe unpacks itself to a temp folder
       # and runs from there on every start, which antivirus programs distrust.
@@ -49,20 +51,50 @@ jobs:
       - name: Smoke test the build
         shell: pwsh
         run: |
-          # The admin entry point must start and parse its arguments (no UI, no server).
           $p = Start-Process dist\WinAirdrop\WinAirdrop.exe -ArgumentList "--elevated" -PassThru -Wait
           if ($p.ExitCode -ne 0) { throw "WinAirdrop.exe --elevated exited with $($p.ExitCode)" }
           foreach ($f in "setup.html", "locales\en.json", "locales\es.json", "assets\icon.png") {
             if (-not (Test-Path "dist\WinAirdrop\_internal\$f")) { throw "Missing $f in the build" }
           }
 
-      - name: Build installer
+      # MSI: installed by msiexec (part of Windows), nothing unpacked to temp.
+      - name: Build installers (MSI, English and Spanish)
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
-          & $iscc /Qp "/DAppVersion=$env:VERSION" "/DSourceDir=..\dist\WinAirdrop" installer\WinAirdrop.iss
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add --global WixToolset.Util.wixext/5.0.2
+          $src = (Resolve-Path dist\WinAirdrop).Path
+          $icon = (Resolve-Path assets\icon.ico).Path
+          foreach ($l in @(@{ code = "en"; name = "English" }, @{ code = "es"; name = "Espanol" })) {
+            wix build installer\WinAirdrop.wxs -arch x64 -ext WixToolset.Util.wixext `
+              -d "Version=$env:MSI_VERSION" -d "Lang=$($l.code)" -d "SourceDir=$src" -d "IconFile=$icon" `
+              -o "dist\WinAirdrop-v$env:VERSION-$($l.name).msi"
+            if ($LASTEXITCODE -ne 0) { throw "WiX failed ($($l.name))" }
+          }
+          Get-ChildItem dist\*.msi | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+
+      - name: Test the installer for real (install, run, uninstall)
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem dist\*-Espanol.msi).FullName
+          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 40; throw "msiexec install exited with $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\WinAirdrop\WinAirdrop.exe"
+          if (-not (Test-Path $exe)) { throw "WinAirdrop.exe was not installed" }
+          $ok = $false
+          foreach ($i in 1..40) {
+            try { $r = Invoke-RestMethod http://127.0.0.1:8770/ping -TimeoutSec 2; if ($r.app -eq "WinAirdrop") { $ok = $true; break } } catch {}
+            Start-Sleep 1
+          }
+          if (-not $ok) { Get-Content "$env:APPDATA\WinAirdrop\winairdrop.log" -ErrorAction SilentlyContinue; throw "WinAirdrop did not start after installing" }
+          "Started after install: version $($r.version)"
+          $lang = (Get-ItemProperty HKCU:\Software\josedag31\WinAirdrop).Language
+          if ($lang -ne "es") { throw "Installer language not saved (got '$lang')" }
+          $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn /l*v uninstall.log" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { Get-Content uninstall.log -Tail 40; throw "msiexec uninstall exited with $($p.ExitCode)" }
+          if (Test-Path $exe) { throw "WinAirdrop.exe still there after uninstalling" }
+          if (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name WinAirdrop -ErrorAction SilentlyContinue) { throw "Startup entry left behind" }
+          "Install / run / uninstall: OK"
 
       - name: Package portable zip and checksums
         shell: pwsh
@@ -73,7 +105,7 @@ jobs:
           # A .env next to the .exe makes the portable copy keep its settings in its own folder.
           New-Item -ItemType File "$name\.env" | Out-Null
           Compress-Archive -Path "$name\*" -DestinationPath "dist\$name.zip"
-          Get-ChildItem dist\WinAirdrop-Setup-*.exe, "dist\$name.zip" | ForEach-Object {
+          Get-ChildItem dist\*.msi, "dist\$name.zip" | ForEach-Object {
             (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower() + "  " + $_.Name
           } | Out-File -Encoding ascii dist\SHA256SUMS.txt
           Get-Content dist\SHA256SUMS.txt
@@ -81,8 +113,15 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/WinAirdrop-Setup-*.exe
+            dist/WinAirdrop-*.msi
             dist/WinAirdrop-*-portable.zip
             dist/SHA256SUMS.txt
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ### Download
+            - 🇪🇸 **Español:** `WinAirdrop-${{ github.ref_name }}-Espanol.msi`
+            - 🇬🇧 **English:** `WinAirdrop-${{ github.ref_name }}-English.msi`
+
+            Double-click it: WinAirdrop installs for your user (no admin rights), starts, and opens its settings page.
+            Portable version (no installation): `WinAirdrop-${{ github.ref_name }}-portable.zip`.

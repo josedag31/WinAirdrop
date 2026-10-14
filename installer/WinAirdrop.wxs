@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WinAirdrop installer (Windows Installer / MSI), built with WiX Toolset v5.
+  Built by .github/workflows/release.yml, once per language:
+
+    wix build installer\WinAirdrop.wxs -arch x64 -ext WixToolset.Util.wixext
+      -d Version=1.0.1 -d Lang=es -d SourceDir=<abs>\dist\WinAirdrop -d IconFile=<abs>\assets\icon.ico
+      -o dist\WinAirdrop-v1.0.1-Espanol.msi
+
+  Why MSI: msiexec (part of Windows) installs it, and nothing is unpacked and run
+  from the temp folder, which antivirus programs distrust.
+  One click: no wizard, no questions, no admin rights (per-user install into
+  %LOCALAPPDATA%\Programs\WinAirdrop). The firewall is allowed later, from the
+  settings page, with a single Windows prompt.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="WinAirdrop"
+           Manufacturer="josedag31"
+           Version="$(Version)"
+           UpgradeCode="7C1E2A4B-3D6F-4E8A-9B5C-0D2F4A6B8C1E"
+           Scope="perUser"
+           Compressed="yes"
+           Language="1033">
+
+    <SummaryInformation Description="WinAirdrop $(Version) - Created by josedag31" Manufacturer="josedag31" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of WinAirdrop is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="WinAirdropIcon" SourceFile="$(IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="WinAirdropIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/josedag31/WinAirdrop" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/josedag31/WinAirdrop/issues" />
+    <Property Id="ARPCONTACT" Value="josedag31" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <!-- Close a running WinAirdrop before updating or uninstalling. -->
+    <util:CloseApplication Id="CloseWinAirdrop" Target="WinAirdrop.exe" CloseMessage="no" TerminateProcess="1" RebootPrompt="no" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsDir" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="WinAirdrop" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Every file of the PyInstaller --onedir build. -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(SourceDir)\**" />
+    </ComponentGroup>
+
+    <!-- Settings that belong to this user: language, start with Windows. -->
+    <Component Id="UserSettings" Directory="INSTALLFOLDER" Guid="9E4B1C2D-5A6F-4B7C-8D9E-0F1A2B3C4D5E">
+      <RegistryValue Root="HKCU" Key="Software\josedag31\WinAirdrop" Name="Language" Type="string" Value="$(Lang)" KeyPath="yes" />
+      <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="WinAirdrop" Type="string"
+                     Value="&quot;[INSTALLFOLDER]WinAirdrop.exe&quot;" />
+      <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+    </Component>
+
+    <!-- Start menu: opening WinAirdrop again shows its settings. -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="2B3C4D5E-6F70-4182-93A4-B5C6D7E8F901">
+        <Shortcut Id="WinAirdropShortcut" Name="WinAirdrop" Description="Receive files from your iPhone - by josedag31"
+                  Target="[INSTALLFOLDER]WinAirdrop.exe" WorkingDirectory="INSTALLFOLDER" Icon="WinAirdropIcon" />
+        <RegistryValue Root="HKCU" Key="Software\josedag31\WinAirdrop" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="WinAirdrop">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="UserSettings" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <!-- Start WinAirdrop when the installation finishes (it opens its settings the first time). -->
+    <CustomAction Id="LaunchWinAirdrop" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]WinAirdrop.exe&quot;" Return="asyncNoWait" Impersonate="yes" Execute="immediate" />
+    <!-- On uninstall: remove WinAirdrop's firewall rules (asks for admin only if there are any). -->
+    <CustomAction Id="CleanUpWinAirdrop" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]WinAirdrop.exe&quot; --uninstall" Return="ignore" Impersonate="yes" Execute="immediate" />
+
+    <InstallExecuteSequence>
+      <Custom Action="CleanUpWinAirdrop" After="InstallInitialize"
+              Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="LaunchWinAirdrop" After="InstallFinalize" Condition="NOT (REMOVE~=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

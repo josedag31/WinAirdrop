@@ -36,7 +36,7 @@ from dotenv import load_dotenv, set_key
 from zeroconf import IPVersion, ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 FROZEN = getattr(sys, "frozen", False)  # PyInstaller .exe
 if FROZEN:
@@ -45,7 +45,7 @@ if FROZEN:
 else:
     ROOT = RESOURCES = Path(__file__).resolve().parent
 # The admin copy (firewall / network tasks) must not create or change any settings.
-ELEVATED = "--elevated" in sys.argv
+ELEVATED = "--elevated" in sys.argv or "--uninstall" in sys.argv
 
 
 def config_dir() -> Path:
@@ -68,22 +68,6 @@ LOG_FILE = CONFIG_DIR / "winairdrop.log"
 if not ENV_FILE.exists() and not ELEVATED:
     ENV_FILE.write_text("", encoding="utf-8")
 
-
-def apply_installer_language() -> None:
-    """The installer leaves the language chosen in setup in a one-line file.
-    Save it to .env once (so a reinstall in another language takes effect)."""
-    marker = CONFIG_DIR / "installer-language"
-    try:
-        language = marker.read_text(encoding="ascii", errors="ignore").strip().lower()
-    except OSError:
-        return
-    if language in ("en", "es"):
-        set_key(str(ENV_FILE), "WINAIRDROP_LANGUAGE", language, quote_mode="never", encoding="utf-8")
-    marker.unlink(missing_ok=True)
-
-
-if not ELEVATED:
-    apply_installer_language()
 load_dotenv(ENV_FILE, encoding="utf-8")
 
 
@@ -128,6 +112,15 @@ def env_flag(key: str, default: bool) -> bool:
 NAME_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 ON_RECEIVE_MODES = ("open", "reveal", "none")
 LANGUAGES = ("en", "es")
+
+
+def installer_language() -> str:
+    """Language of the installer the user downloaded (English or Español MSI)."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\josedag31\WinAirdrop") as key:
+            return str(winreg.QueryValueEx(key, "Language")[0]).strip().lower()
+    except OSError:
+        return ""
 
 
 def system_language() -> str:
@@ -178,8 +171,10 @@ NOTIFY = env_flag("WINAIRDROP_NOTIFICATIONS", True)
 ON_RECEIVE = (os.getenv("WINAIRDROP_ON_RECEIVE") or "open").strip().lower()
 if ON_RECEIVE not in ON_RECEIVE_MODES:
     ON_RECEIVE = "open"
-# Chosen in the installer or the settings page; empty = Windows language.
+# Settings page / .env first, then the installer the user picked, then Windows.
 LANGUAGE = (os.getenv("WINAIRDROP_LANGUAGE") or "").strip().lower()
+if LANGUAGE not in LANGUAGES:
+    LANGUAGE = installer_language()
 if LANGUAGE not in LANGUAGES:
     LANGUAGE = system_language()
 TOKEN = os.getenv("WINAIRDROP_TOKEN")
@@ -490,6 +485,27 @@ def elevated_main(argv: list[str]) -> int:
     except Exception as e:
         log(f"Admin task failed: {e}")
         return 1
+
+
+def is_admin() -> bool:
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def uninstall_main() -> int:
+    """Run by the uninstaller: remove WinAirdrop's firewall rules, asking for
+    admin rights only if there is something to remove. Never fails the uninstall."""
+    try:
+        has_rules = any(r.Grouping == FW_GROUP for r in com_object("HNetCfg.FwPolicy2").Rules)
+        if has_rules:
+            remove_firewall_rules() if is_admin() else run_elevated(["--remove-firewall"])
+        set_startup(False)
+    except Exception as e:
+        log(f"Uninstall cleanup: {e}")
+    return 0
 
 
 def run_elevated(args: list[str]) -> bool:
@@ -1003,6 +1019,8 @@ async def main() -> int:
 if __name__ == "__main__":
     if sys.stdout is None:  # pythonw / windowed .exe: no console, log to file
         sys.stdout = sys.stderr = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+    if "--uninstall" in sys.argv:
+        sys.exit(uninstall_main())
     if ELEVATED:
         sys.exit(elevated_main(sys.argv[sys.argv.index("--elevated") + 1:]))
     try:

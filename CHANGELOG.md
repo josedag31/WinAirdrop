@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-14
+
+### Changed
+- The installer is now a one-click Windows Installer (MSI) package, one per language (English / Español), instead of an Inno Setup wizard. It's run by Windows' own `msiexec` and nothing is unpacked to the temp folder, which antivirus programs (e.g. Avast CyberCapture) blocked.
+- The firewall is allowed from the settings page (one Windows prompt) instead of during the installation.
+- No PowerShell anywhere: firewall, networks, folder picker and startup use Windows APIs directly; the program is a normal folder instead of a self-extracting `.exe`. Antivirus programs blocked PowerShell launched by WinAirdrop.
+
+### Added
+- Tray icon next to the clock (open settings, open folder, quit); notifications come from it.
+- Every release is installed, started and uninstalled automatically on GitHub Actions before it's published.
+
 ## [1.0.0] - 2026-10-14
 
 First public release.
@@ -28,5 +39,6 @@ First public release.
 - Settings page restricted to loopback, with Host-header validation (DNS-rebinding protection), anti-CSRF tokens and security headers.
 - Firewall rules limited to the Private network profile; networks are trusted one by one, never in bulk.
 
-[Unreleased]: https://github.com/josedag31/WinAirdrop/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/josedag31/WinAirdrop/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/josedag31/WinAirdrop/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/josedag31/WinAirdrop/releases/tag/v1.0.0

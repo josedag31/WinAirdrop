@@ -62,8 +62,8 @@ Tap Share → **WinAirdrop** and the photo pops up on your PC. No cables, no clo
 
 ## 🚀 Quick start
 
-1. **[Download `WinAirdrop-Setup.exe`](https://github.com/josedag31/WinAirdrop/releases/latest)** and run it.
-2. The settings page opens in your browser. Click **Allow WinAirdrop** (firewall) if it asks.
+1. **[Download the installer](https://github.com/josedag31/WinAirdrop/releases/latest)** in your language (`…-English.msi` or `…-Espanol.msi`) and double-click it.
+2. WinAirdrop installs in seconds and opens its settings page. Click **Allow WinAirdrop** (firewall).
 3. Follow **Connect your iPhone** on that page to create the Shortcut (about 3 minutes, only once).
 
 That's it. Share something from your iPhone → **WinAirdrop** → it pops up on your PC. 🎉
@@ -80,11 +80,14 @@ That's it. Share something from your iPhone → **WinAirdrop** → it pops up on
 
 ### Installer (recommended)
 
-1. Download **`WinAirdrop-Setup-vX.Y.Z.exe`** from [Releases](https://github.com/josedag31/WinAirdrop/releases/latest). Releases are code-signed via the SignPath Foundation ([code signing policy](#-code-signing-policy)).
-2. Run it and **choose your language** (English or Spanish). It installs **for your user only** and doesn't need administrator rights. The two options:
-   - **Start with Windows** (recommended).
-   - **Allow through the firewall**: asks for administrator permission once.
-3. When it finishes, WinAirdrop starts and **opens its settings page** in your browser.
+1. From [Releases](https://github.com/josedag31/WinAirdrop/releases/latest), download the installer in your language:
+   - 🇬🇧 `WinAirdrop-vX.Y.Z-English.msi`
+   - 🇪🇸 `WinAirdrop-vX.Y.Z-Espanol.msi`
+
+   Releases are code-signed via the SignPath Foundation ([code signing policy](#-code-signing-policy)).
+2. **Double-click it.** There are no questions: it installs **for your user only** in a few seconds, without administrator rights, and is set to start with Windows (you can turn that off in the settings).
+3. WinAirdrop starts, its icon appears next to the clock, and its **settings page opens** in your browser.
+4. On that page, click **Allow WinAirdrop** to let it through the firewall (one Windows permission prompt, private networks only).
 
 To open the settings later, **open WinAirdrop again from the Start menu**. If it's already running, that brings up the settings page.
 
@@ -103,7 +106,7 @@ Download `WinAirdrop-vX.Y.Z-portable.zip`, unzip it to a permanent folder and ru
 Each release includes `SHA256SUMS.txt`. Compare it with:
 
 ```powershell
-(Get-FileHash .\WinAirdrop-Setup-v1.0.0.exe -Algorithm SHA256).Hash
+(Get-FileHash .\WinAirdrop-v1.0.1-English.msi -Algorithm SHA256).Hash
 ```
 </details>
 
@@ -161,7 +164,7 @@ Everything can be changed from the **settings page**: open WinAirdrop from the S
 | **Smart names** | On | Rename photos and videos by capture date |
 | **Notifications** | On | Windows notification when files arrive |
 | **Start with Windows** | On (installer) | Run in the background when you sign in |
-| **Language** | Installer choice | English or Spanish: page, notifications, file names |
+| **Language** | The installer you downloaded | English or Spanish: page, notifications, file names |
 | **Network name** | `winairdrop-<computer>` | The iPhone finds the PC as `<name>.local` |
 | **Port** | `8770` | Only change it if another program uses 8770 |
 
@@ -352,7 +355,7 @@ Run the tests and build the executable:
 .\.venv\Scripts\pyinstaller.exe --onefile --noconsole --name WinAirdrop --icon assets/icon.ico --add-data "setup.html;." --add-data "locales;locales" --collect-submodules zeroconf winairdrop.py
 ```
 
-The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [`installer/WinAirdrop.iss`](installer/WinAirdrop.iss). Releases are built and published by GitHub Actions when a `vX.Y.Z` tag is pushed ([release.yml](.github/workflows/release.yml)).
+The installers are Windows Installer (MSI) packages built with [WiX Toolset v5](https://wixtoolset.org) from [`installer/WinAirdrop.wxs`](installer/WinAirdrop.wxs), one per language. Releases are built and published by GitHub Actions when a `vX.Y.Z` tag is pushed ([release.yml](.github/workflows/release.yml)).
 
 <details>
 <summary><b>Project structure</b></summary>
@@ -362,7 +365,7 @@ WinAirdrop/
 ├── winairdrop.py          # the server: HTTP, mDNS, settings API, files, notifications
 ├── setup.html             # the settings page (/setup)
 ├── locales/               # English and Spanish texts
-├── installer/             # Inno Setup script
+├── installer/             # WiX (MSI) installer and exe version info
 ├── start.ps1              # start from source in the background
 ├── .env.example           # every setting, documented
 ├── tests/                 # pytest suite (no network needed)
@@ -416,7 +419,7 @@ If WinAirdrop saves you some cables, consider giving it a ⭐. It helps other pe
 ## 🙏 Acknowledgements
 
 - [SEEMOO Lab (TU Darmstadt)](https://github.com/seemoo-lab): their [OpenDrop](https://github.com/seemoo-lab/opendrop) and [OWL](https://github.com/seemoo-lab/owl) research documented how AirDrop works.
-- [aiohttp](https://github.com/aio-libs/aiohttp), [python-zeroconf](https://github.com/python-zeroconf/python-zeroconf), [Pillow](https://github.com/python-pillow/Pillow), [PyInstaller](https://github.com/pyinstaller/pyinstaller) and [Inno Setup](https://jrsoftware.org/isinfo.php).
+- [aiohttp](https://github.com/aio-libs/aiohttp), [python-zeroconf](https://github.com/python-zeroconf/python-zeroconf), [Pillow](https://github.com/python-pillow/Pillow), [PyInstaller](https://github.com/pyinstaller/pyinstaller) and [WiX Toolset](https://wixtoolset.org).
 
 ## 📄 License
 
