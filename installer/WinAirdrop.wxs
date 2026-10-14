@@ -46,7 +46,7 @@
       </Directory>
     </StandardDirectory>
 
-    <!-- Every file of the PyInstaller --onedir build. -->
+    <!-- Every file of the PyInstaller one-folder build. -->
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(SourceDir)\**" />
     </ComponentGroup>
