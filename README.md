@@ -80,7 +80,7 @@ That's it. Share something from your iPhone → **WinAirdrop** → it pops up on
 
 ### Installer (recommended)
 
-1. Download **`WinAirdrop-Setup-vX.Y.Z.exe`** from [Releases](https://github.com/josedag31/WinAirdrop/releases/latest).
+1. Download **`WinAirdrop-Setup-vX.Y.Z.exe`** from [Releases](https://github.com/josedag31/WinAirdrop/releases/latest). Releases are code-signed via the SignPath Foundation ([code signing policy](#-code-signing-policy)).
 2. Run it and **choose your language** (English or Spanish). It installs **for your user only** and doesn't need administrator rights. The two options:
    - **Start with Windows** (recommended).
    - **Allow through the firewall**: asks for administrator permission once.
@@ -396,6 +396,8 @@ curl -H "Authorization: Bearer $TOKEN" -F file=@photo.jpg -F file=@notes.pdf htt
 Ideas welcome: [open a feature request](https://github.com/josedag31/WinAirdrop/issues/new/choose).
 
 ## 🔏 Code signing policy
+
+Windows releases are code-signed through the **SignPath Foundation**: free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org) *(application in progress; releases are unsigned until it's approved)*.
 
 WinAirdrop releases are built automatically by [GitHub Actions](.github/workflows/release.yml) from the source code in this repository. Nothing is built or uploaded by hand.
 
