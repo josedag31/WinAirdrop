@@ -13,7 +13,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - No PowerShell anywhere: firewall, networks, folder picker and startup use Windows APIs directly; the program is a normal folder instead of a self-extracting `.exe`. Antivirus programs blocked PowerShell launched by WinAirdrop.
 
 ### Added
-- Tray icon next to the clock (open settings, open folder, quit); notifications come from it.
 - The settings page can pair the iPhone with two QR codes: one to install a shared Shortcut (once it's published) and one with this PC's address and token, which the Shortcut scans the first time. The address now has its own QR too.
 - Every installer is checked on GitHub Actions before it's published (extracted and checked for all the program's files).
 

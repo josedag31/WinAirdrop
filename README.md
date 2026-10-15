@@ -84,7 +84,7 @@ That's it. Share something from your iPhone → **WinAirdrop** → it pops up on
    - 🇬🇧 `WinAirdrop-vX.Y.Z-English.msi`
    - 🇪🇸 `WinAirdrop-vX.Y.Z-Espanol.msi`
 
-   Releases are code-signed via the SignPath Foundation ([code signing policy](#-code-signing-policy)).
+   See the [code signing policy](#-code-signing-policy).
 2. **Double-click it.** There are no questions: it installs **for your user only** in a few seconds, without administrator rights, and is set to start with Windows (you can turn that off in the settings).
 3. WinAirdrop starts, its icon appears next to the clock, and its **settings page opens** in your browser.
 4. On that page, click **Allow WinAirdrop** to let it through the firewall (one Windows permission prompt, private networks only).
@@ -400,7 +400,7 @@ Ideas welcome: [open a feature request](https://github.com/josedag31/WinAirdrop/
 
 ## 🔏 Code signing policy
 
-Windows releases are code-signed through the **SignPath Foundation**: free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org) *(application in progress; releases are unsigned until it's approved)*.
+Releases are **not code-signed yet**, which is why Windows SmartScreen and some antivirus programs warn about them. Code signing is planned; when it's in place, this section will name the certificate and its provider.
 
 WinAirdrop releases are built automatically by [GitHub Actions](.github/workflows/release.yml) from the source code in this repository. Nothing is built or uploaded by hand.
 
