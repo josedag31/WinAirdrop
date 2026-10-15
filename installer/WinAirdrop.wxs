@@ -84,7 +84,7 @@
     <InstallExecuteSequence>
       <Custom Action="CleanUpWinAirdrop" After="InstallInitialize"
               Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
-      <Custom Action="LaunchWinAirdrop" After="InstallFinalize" Condition="NOT (REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="LaunchWinAirdrop" After="InstallFinalize" Condition="NOT (REMOVE~=&quot;ALL&quot;) AND NOT NOLAUNCH" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

@@ -74,36 +74,51 @@ jobs:
           }
           Get-ChildItem dist\*.msi | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
 
+      # Keep the installers even if the next step hangs the runner.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers
+          path: dist/*.msi
+          retention-days: 14
+
       - name: Test the installer for real (install, run, uninstall)
         shell: pwsh
         timeout-minutes: 10
         run: |
-          # Wait for msiexec only: Start-Process -Wait would also wait for WinAirdrop,
-          # which the MSI starts and which keeps running (as it should).
+          function Step($m) { "[{0:HH:mm:ss}] {1}" -f (Get-Date), $m }
+          # Wait for msiexec only, with a limit (Start-Process -Wait also waits for children).
           function Invoke-Msi($arguments, $log) {
             $p = Start-Process msiexec -ArgumentList "$arguments /qn /l*v $log" -PassThru
             if (-not $p.WaitForExit(300000)) { Get-Content $log -Tail 40; throw "msiexec timed out: $arguments" }
             if ($p.ExitCode -ne 0) { Get-Content $log -Tail 40; throw "msiexec exited with $($p.ExitCode): $arguments" }
           }
           $msi = (Get-ChildItem dist\*-Espanol.msi).FullName
-          Invoke-Msi "/i `"$msi`"" install.log
+
+          Step "Installing (NOLAUNCH: this script starts WinAirdrop itself)"
+          Invoke-Msi "/i `"$msi`" NOLAUNCH=1" install.log
           $exe = "$env:LOCALAPPDATA\Programs\WinAirdrop\WinAirdrop.exe"
-          if (-not (Test-Path $exe)) { throw "WinAirdrop.exe was not installed" }
+          if (-not (Test-Path $exe)) { throw "WinAirdrop.exe was not installed in $exe" }
+          $lang = (Get-ItemProperty HKCU:\Software\josedag31\WinAirdrop).Language
+          if ($lang -ne "es") { throw "Installer language not saved (got '$lang')" }
+          Step "Installed. Language: $lang"
+
+          Step "Starting WinAirdrop (CI=true: it won't open a browser)"
+          Start-Process $exe | Out-Null
           $ok = $false
           foreach ($i in 1..40) {
             try { $r = Invoke-RestMethod http://127.0.0.1:8770/ping -TimeoutSec 2; if ($r.app -eq "WinAirdrop") { $ok = $true; break } } catch {}
             Start-Sleep 1
           }
-          if (-not $ok) { Get-Content "$env:APPDATA\WinAirdrop\winairdrop.log" -ErrorAction SilentlyContinue; throw "WinAirdrop did not start after installing" }
-          "Started after install: version $($r.version)"
-          $lang = (Get-ItemProperty HKCU:\Software\josedag31\WinAirdrop).Language
-          if ($lang -ne "es") { throw "Installer language not saved (got '$lang')" }
+          if (-not $ok) { Get-Content "$env:APPDATA\WinAirdrop\winairdrop.log" -ErrorAction SilentlyContinue; throw "WinAirdrop did not answer /ping" }
+          Step "Running: version $($r.version)"
+
+          Step "Uninstalling"
           Invoke-Msi "/x `"$msi`"" uninstall.log
           Start-Sleep 2
-          if (Get-Process WinAirdrop -ErrorAction SilentlyContinue) { throw "WinAirdrop still running after uninstalling" }
           if (Test-Path $exe) { throw "WinAirdrop.exe still there after uninstalling" }
+          if (Get-Process WinAirdrop -ErrorAction SilentlyContinue) { throw "WinAirdrop still running after uninstalling" }
           if (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name WinAirdrop -ErrorAction SilentlyContinue) { throw "Startup entry left behind" }
-          "Install / run / uninstall: OK"
+          Step "Install / run / uninstall: OK"
 
       - name: Package portable zip and checksums
         shell: pwsh

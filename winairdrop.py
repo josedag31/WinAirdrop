@@ -1021,7 +1021,8 @@ async def main() -> int:
         return 1
     log(f"WinAirdrop {__version__} listening on port {PORT}. Files -> {FOLDER}")
     log(f"Settings: {setup_url()}")
-    if FIRST_RUN or not os.getenv("WINAIRDROP_RELAUNCH") and "--settings" in sys.argv:
+    # Never open a browser on a CI server (no desktop: it can hang the machine).
+    if (FIRST_RUN or not os.getenv("WINAIRDROP_RELAUNCH") and "--settings" in sys.argv) and not os.getenv("CI"):
         webbrowser.open(setup_url())
 
     global TRAY
