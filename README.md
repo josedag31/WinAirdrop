@@ -68,6 +68,16 @@ Tap Share → **WinAirdrop** and the photo pops up on your PC. No cables, no clo
 
 That's it. Share something from your iPhone → **WinAirdrop** → it pops up on your PC. 🎉
 
+> [!IMPORTANT]
+> **The first time, Windows or your antivirus will probably warn you. That's normal.** WinAirdrop is new and not code-signed yet, so:
+> - **Windows SmartScreen** may show *“Windows protected your PC”* (*“Windows protegió su PC”*): click **More info → Run anyway**.
+> - **Antivirus programs** like Avast may show *“Suspicious file detected”* (*“Archivo sospechoso detectado”*) and analyse WinAirdrop for about a minute. Wait: it ends with *“The file looks safe”* (*“El archivo parece seguro”*). If it asks, choose **Open anyway**. If WinAirdrop then says it's blocked, open it again from the Start menu.
+>
+> This only happens the first time each version runs. [Why?](#windows-or-my-antivirus-warns-about-winairdrop)
+
+> [!TIP]
+> **Can't see WinAirdrop when you tap Share?** In the Share menu, scroll down to the bottom → **Edit Actions…** (*Editar acciones…*) → find **WinAirdrop** and tap **+** to add it to your favourites. It will then appear near the top every time.
+
 ## 📦 Installation
 
 ### Requirements
@@ -160,6 +170,8 @@ Open the settings page (**<http://localhost:8770/setup>**, or open WinAirdrop fr
 ## 👆 Usage
 
 On your iPhone or iPad: open any photo, video or file → **Share** → **WinAirdrop**.
+
+If **WinAirdrop** isn't in the list, scroll to the bottom of the Share menu → **Edit Actions…** (*Editar acciones…*) → tap **+** next to **WinAirdrop**.
 
 - **It pops up on your PC**: a photo, video, audio file, PDF or text file opens in its default app, just like AirDrop on a Mac. Send several at once and File Explorer opens with them selected.
 - Files are saved to **`Pictures\WinAirdrop`** by default (you can change this in the settings).
