@@ -36,7 +36,7 @@ from dotenv import load_dotenv, set_key
 from zeroconf import IPVersion, ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 FROZEN = getattr(sys, "frozen", False)  # PyInstaller .exe
 if FROZEN:
@@ -208,8 +208,8 @@ SAFE_TO_OPEN = {
 # Ready-made iOS Shortcut, shared from iCloud (no address or token inside: it
 # reads them from the "pair" QR code the first time). Empty = not published yet.
 SHORTCUT_LINKS = {
-    "es": "",
-    "en": "",
+    "es": "https://www.icloud.com/shortcuts/aaeb86cd9401452bab052989157bb89d",
+    "en": "https://www.icloud.com/shortcuts/aaeb86cd9401452bab052989157bb89d",  # same Shortcut until there is an English copy
 }
 VIRTUAL_ADAPTERS = re.compile(
     r"vEthernet|Hyper-V|WSL|Docker|VirtualBox|VMware|Loopback|Bluetooth|TAP-|WireGuard|Tailscale|TunnelBear|ZeroTier",

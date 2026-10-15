@@ -64,7 +64,7 @@ Tap Share → **WinAirdrop** and the photo pops up on your PC. No cables, no clo
 
 1. **[Download the installer](https://github.com/josedag31/WinAirdrop/releases/latest)** in your language (`…-English.msi` or `…-Espanol.msi`) and double-click it.
 2. WinAirdrop installs in seconds and opens its settings page. Click **Allow WinAirdrop** (firewall).
-3. Follow **Connect your iPhone** on that page to create the Shortcut (about 3 minutes, only once).
+3. Under **Connect your iPhone**, scan the two QR codes with your iPhone camera: **Install the Shortcut**, then **Pair it with this PC** (the first time you share something).
 
 That's it. Share something from your iPhone → **WinAirdrop** → it pops up on your PC. 🎉
 
@@ -119,6 +119,17 @@ Your received files and your settings (`%APPDATA%\WinAirdrop`) are kept. Delete 
 
 ## 📲 Set up the iPhone Shortcut
 
+**The easy way (two scans, no typing):** open the settings page and, under **Connect your iPhone**:
+
+1. Scan **Install the Shortcut** with the iPhone camera → **Add Shortcut**. (Or open [the Shortcut on iCloud](https://www.icloud.com/shortcuts/aaeb86cd9401452bab052989157bb89d) on your iPhone.)
+2. Share any photo → **WinAirdrop**. The first time, a code scanner opens: scan **Pair it with this PC**. From then on it sends straight away.
+
+The shared Shortcut contains no address or token: it saves the pairing in `Shortcuts/WinAirdrop.txt` on your iPhone. If you reset the token on the PC, it tells you and asks you to scan the pairing code again.
+
+<details>
+<summary><b>Or build the Shortcut yourself</b></summary>
+
+
 Open the settings page (**<http://localhost:8770/setup>**, or open WinAirdrop from the Start menu). Under **Connect your iPhone** you'll find your personal URL and token, a QR code for the token, and these steps.
 
 <details open>
@@ -135,6 +146,8 @@ Open the settings page (**<http://localhost:8770/setup>**, or open WinAirdrop fr
    - **Request Body**: `Form` → add a **File** field with key `file` and value **Repeat Item**.
 6. After **End Repeat**, add **Show Notification** → `Sent to PC ✅`.
 7. The first time you run it, iOS asks to **find devices on your local network**. Tap **Allow**.
+
+</details>
 
 </details>
 

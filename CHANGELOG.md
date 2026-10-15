@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-15
+
+### Added
+- Ready-made iOS Shortcut, shared from iCloud. The settings page now shows two QR codes: **Install the Shortcut** and **Pair it with this PC**. Setting up an iPhone takes two camera scans and no typing.
+- The Shortcut keeps its pairing in `Shortcuts/WinAirdrop.txt`; if the PC's token changes, it tells the user and asks to scan the pairing code again.
+
 ## [1.0.1] - 2026-10-14
 
 ### Changed
@@ -42,6 +48,7 @@ First public release.
 - Settings page restricted to loopback, with Host-header validation (DNS-rebinding protection), anti-CSRF tokens and security headers.
 - Firewall rules limited to the Private network profile; networks are trusted one by one, never in bulk.
 
-[Unreleased]: https://github.com/josedag31/WinAirdrop/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/josedag31/WinAirdrop/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/josedag31/WinAirdrop/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/josedag31/WinAirdrop/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/josedag31/WinAirdrop/releases/tag/v1.0.0
