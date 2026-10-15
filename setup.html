@@ -50,6 +50,14 @@
   .val code { flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; word-break:break-all; font:13.5px ui-monospace, Consolas, monospace; }
   .help { color:var(--muted); font-size:13.5px; margin:0 0 14px; }
   .qr img { border-radius:10px; background:#fff; padding:6px; display:block; margin:6px 0; }
+  .pair { display:grid; gap:0; padding:6px 20px; }
+  .pair-step { display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:center; padding:16px 0; border-bottom:1px solid var(--line); }
+  .pair-step:last-child { border-bottom:0; }
+  .pair-step .n { display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--acc-bg); color:var(--acc); font-weight:700; }
+  .pair-text p { margin:4px 0 0; }
+  .pair-qr { border-radius:10px; background:#fff; padding:6px; }
+  @media (max-width:640px) { .pair-step { grid-template-columns:auto 1fr; } .pair-qr { grid-column:1 / -1; justify-self:center; } }
+  .qr-pair { display:flex; gap:16px; flex-wrap:wrap; }
   details { margin-top:12px; } details > summary { cursor:pointer; font-weight:600; padding:4px 0; }
   ol.steps { counter-reset:s; list-style:none; padding:0; margin:8px 0 0; }
   ol.steps > li { counter-increment:s; position:relative; padding:12px 0 12px 42px; border-top:1px solid var(--line); }
@@ -121,24 +129,43 @@
 
   <h2 data-i18n="s2_title"></h2>
   <p class="intro" data-i18n-html="s2_intro"></p>
-  <div class="card grid">
-    <div>
-      <div class="label" data-i18n="url_label"></div>
-      <div class="val"><code id="url">{{URL}}</code><button data-copy="url" data-i18n="copy"></button></div>
-      <p class="help" data-i18n="url_help"></p>
-      <div class="label" data-i18n="token_label"></div>
-      <div class="val"><code id="auth">Bearer {{TOKEN}}</code><button data-copy="auth" data-i18n="copy"></button></div>
-      <p class="help" data-i18n="token_help"></p>
+
+  <div class="card pair" id="pair">
+    <div class="pair-step" id="pair-install">
+      <span class="n">1</span>
+      <div class="pair-text"><b data-i18n="pair1_title"></b><p class="help" data-i18n-html="pair1_text"></p></div>
+      <img class="pair-qr" alt="QR" src="data:image/png;base64,{{QR_SHORTCUT}}" width="170" height="170">
     </div>
-    <div class="qr">
-      <div class="label" data-i18n="qr_label"></div>
-      <img alt="QR" src="data:image/png;base64,{{QR_TOKEN}}" width="180" height="180">
-      <div class="help" style="max-width:180px" data-i18n="qr_help"></div>
+    <div class="pair-step">
+      <span class="n">2</span>
+      <div class="pair-text"><b data-i18n="pair2_title"></b><p class="help" data-i18n-html="pair2_text"></p>
+        <p class="help" data-i18n="pair2_secret"></p></div>
+      <img class="pair-qr secret" alt="QR" src="data:image/png;base64,{{QR_PAIR}}" width="170" height="170">
     </div>
   </div>
+  <div class="tip" id="pair-missing" hidden data-i18n-html="pair_missing"></div>
+
   <div class="card" style="margin-top:12px">
     <details id="steps">
       <summary data-i18n="steps_title"></summary>
+      <p class="help" data-i18n-html="manual_intro"></p>
+      <div class="grid">
+        <div>
+          <div class="label" data-i18n="url_label"></div>
+          <div class="val"><code id="url">{{URL}}</code><button data-copy="url" data-i18n="copy"></button></div>
+          <p class="help" data-i18n="url_help"></p>
+          <div class="label" data-i18n="token_label"></div>
+          <div class="val"><code id="auth">Bearer {{TOKEN}}</code><button data-copy="auth" data-i18n="copy"></button></div>
+          <p class="help" data-i18n="token_help"></p>
+        </div>
+        <div class="qr qr-pair">
+          <div><div class="label" data-i18n="url_qr_label"></div>
+            <img alt="QR" src="data:image/png;base64,{{QR_URL}}" width="140" height="140"></div>
+          <div><div class="label" data-i18n="qr_label"></div>
+            <img class="secret" alt="QR" src="data:image/png;base64,{{QR_TOKEN}}" width="140" height="140"></div>
+        </div>
+      </div>
+      <p class="help" data-i18n="qr_help"></p>
       <ol class="steps">
         <li data-i18n-html="step_1"></li><li data-i18n-html="step_2"></li><li data-i18n-html="step_3"></li>
         <li data-i18n-html="step_4"></li><li data-i18n-html="step_5"></li><li data-i18n-html="step_6"></li>
@@ -257,7 +284,12 @@
     $("name-preview").textContent = s.name;
   }
   fill(initial);
-  if (initial.first_run) $("steps").open = true;
+  if (!initial.shortcut_link) {
+    // No ready-made Shortcut yet: show the manual steps instead of the two QR codes.
+    $("pair").hidden = true; $("pair-missing").hidden = false; $("steps").open = true;
+  } else if (initial.first_run) {
+    $("pair").scrollIntoView({ block: "center" });
+  }
   form.name.addEventListener("input", () => $("name-preview").textContent = form.name.value.toLowerCase());
 
   async function save(extra) {

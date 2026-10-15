@@ -1,6 +1,7 @@
 """Offline tests: safe file names, capture dates and the upload API."""
 
 import calendar
+import json
 import os
 import struct
 import sys
@@ -356,6 +357,27 @@ def test_fix_network_runs_winairdrop_elevated(monkeypatch):
     monkeypatch.setattr(w, "run_elevated", lambda args: seen.append(args) or True)
     assert w.fix_network("Home")
     assert seen == [["--firewall", str(w.PORT), "--private", "Home"]]
+
+
+# --- Pairing the iPhone Shortcut ---------------------------------------------------------
+
+def test_pairing_qr_carries_only_url_and_auth():
+    data = json.loads(w.pairing_data())
+    assert data == {"url": f"http://{w.NAME}.local:{w.PORT}/upload", "auth": f"Bearer {w.TOKEN}"}
+
+
+def test_shortcut_link_falls_back_to_any_language(monkeypatch):
+    monkeypatch.setattr(w, "SHORTCUT_LINKS", {"es": "", "en": ""})
+    assert w.shortcut_link() == ""
+    monkeypatch.setattr(w, "SHORTCUT_LINKS", {"es": "", "en": "https://www.icloud.com/shortcuts/abc"})
+    monkeypatch.setattr(w, "LANGUAGE", "es")
+    assert w.shortcut_link() == "https://www.icloud.com/shortcuts/abc"
+
+
+async def test_setup_page_has_pairing_and_url_qr(local):
+    page = await (await local.get("/setup")).text()
+    assert page.count("data:image/png;base64,iVBOR") >= 3  # pair, URL and token QR codes
+    assert '"shortcut_link"' in page
 
 
 async def test_reset_token(local):

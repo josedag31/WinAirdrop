@@ -16,6 +16,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -75,10 +76,17 @@ jobs:
 
       - name: Test the installer for real (install, run, uninstall)
         shell: pwsh
+        timeout-minutes: 10
         run: |
+          # Wait for msiexec only: Start-Process -Wait would also wait for WinAirdrop,
+          # which the MSI starts and which keeps running (as it should).
+          function Invoke-Msi($arguments, $log) {
+            $p = Start-Process msiexec -ArgumentList "$arguments /qn /l*v $log" -PassThru
+            if (-not $p.WaitForExit(300000)) { Get-Content $log -Tail 40; throw "msiexec timed out: $arguments" }
+            if ($p.ExitCode -ne 0) { Get-Content $log -Tail 40; throw "msiexec exited with $($p.ExitCode): $arguments" }
+          }
           $msi = (Get-ChildItem dist\*-Espanol.msi).FullName
-          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log" -PassThru -Wait
-          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 40; throw "msiexec install exited with $($p.ExitCode)" }
+          Invoke-Msi "/i `"$msi`"" install.log
           $exe = "$env:LOCALAPPDATA\Programs\WinAirdrop\WinAirdrop.exe"
           if (-not (Test-Path $exe)) { throw "WinAirdrop.exe was not installed" }
           $ok = $false
@@ -90,8 +98,9 @@ jobs:
           "Started after install: version $($r.version)"
           $lang = (Get-ItemProperty HKCU:\Software\josedag31\WinAirdrop).Language
           if ($lang -ne "es") { throw "Installer language not saved (got '$lang')" }
-          $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn /l*v uninstall.log" -PassThru -Wait
-          if ($p.ExitCode -ne 0) { Get-Content uninstall.log -Tail 40; throw "msiexec uninstall exited with $($p.ExitCode)" }
+          Invoke-Msi "/x `"$msi`"" uninstall.log
+          Start-Sleep 2
+          if (Get-Process WinAirdrop -ErrorAction SilentlyContinue) { throw "WinAirdrop still running after uninstalling" }
           if (Test-Path $exe) { throw "WinAirdrop.exe still there after uninstalling" }
           if (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name WinAirdrop -ErrorAction SilentlyContinue) { throw "Startup entry left behind" }
           "Install / run / uninstall: OK"

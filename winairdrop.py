@@ -205,6 +205,12 @@ SAFE_TO_OPEN = {
     ".mp3", ".m4a", ".aac", ".wav", ".flac",
     ".pdf", ".txt",
 }
+# Ready-made iOS Shortcut, shared from iCloud (no address or token inside: it
+# reads them from the "pair" QR code the first time). Empty = not published yet.
+SHORTCUT_LINKS = {
+    "es": "",
+    "en": "",
+}
 VIRTUAL_ADAPTERS = re.compile(
     r"vEthernet|Hyper-V|WSL|Docker|VirtualBox|VMware|Loopback|Bluetooth|TAP-|WireGuard|Tailscale|TunnelBear|ZeroTier",
     re.I)
@@ -724,7 +730,23 @@ def current_settings() -> dict:
         "language": LANGUAGE,
         "startup": startup_enabled(),
         "first_run": FIRST_RUN,
+        "shortcut_link": shortcut_link(),
     }
+
+
+def shortcut_link() -> str:
+    # WINAIRDROP_SHORTCUT_LINK: for forks that publish their own Shortcut.
+    return (os.getenv("WINAIRDROP_SHORTCUT_LINK") or SHORTCUT_LINKS.get(LANGUAGE)
+            or next((link for link in SHORTCUT_LINKS.values() if link), ""))
+
+
+def pairing_data() -> str:
+    """What the "pair" QR code carries: everything the Shortcut needs, nothing else."""
+    return json.dumps({"url": upload_url(), "auth": f"Bearer {TOKEN}"}, separators=(",", ":"))
+
+
+def upload_url() -> str:
+    return f"http://{NAME}.local:{PORT}/upload"
 
 
 def json_for_script(data) -> str:
@@ -736,7 +758,10 @@ def json_for_script(data) -> str:
 async def setup(request: web.Request) -> web.Response:
     page = (RESOURCES / "setup.html").read_text(encoding="utf-8")
     values = {
-        "URL": escape(f"http://{NAME}.local:{PORT}/upload"),
+        "URL": escape(upload_url()),
+        "QR_URL": qr_png(upload_url()),
+        "QR_PAIR": qr_png(pairing_data()),
+        "QR_SHORTCUT": qr_png(shortcut_link()) if shortcut_link() else "",
         "TOKEN": escape(TOKEN),
         "QR_TOKEN": qr_png(f"Bearer {TOKEN}"),
         "IPS": escape(", ".join(lan_ips()) or "no network"),
