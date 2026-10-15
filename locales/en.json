@@ -9,7 +9,9 @@
     "pick_folder": "Where should WinAirdrop save the files you send?",
     "tray_settings": "Open settings",
     "tray_folder": "Open received files",
-    "tray_quit": "Quit WinAirdrop"
+    "tray_quit": "Quit WinAirdrop",
+    "port_blocked_title": "WinAirdrop is blocked",
+    "port_blocked_text": "Windows or your antivirus isn't letting WinAirdrop receive files (port {port}).\n\nThis usually happens the first time it opens: some antivirus programs, like Avast, analyse it in an isolated environment. Wait for the analysis to finish, allow WinAirdrop if your antivirus asks, and open it again from the Start menu."
   },
   "page": {
     "title": "WinAirdrop Settings",

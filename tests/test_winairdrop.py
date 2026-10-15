@@ -380,6 +380,16 @@ async def test_setup_page_has_pairing_and_url_qr(local):
     assert '"shortcut_link"' in page
 
 
+def test_port_in_use_vs_blocked():
+    busy = OSError(10048, "Only one usage of each socket address")
+    busy.winerror = 10048
+    assert w.port_in_use(busy)
+    assert w.port_in_use(OSError(98, "Address already in use"))
+    denied = OSError(10013, "An attempt was made to access a socket in a way forbidden")
+    denied.winerror = 10013
+    assert not w.port_in_use(denied)  # antivirus sandbox / firewall: a different message
+
+
 async def test_reset_token(local):
     old = w.TOKEN
     r = await local.post("/api/reset-token", headers=csrf_headers(local))

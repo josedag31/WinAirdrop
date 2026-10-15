@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-15
+
+### Fixed
+- When an antivirus (e.g. Avast CyberCapture) runs WinAirdrop in its sandbox on first launch and blocks its network port, WinAirdrop now says so and explains what to do, instead of wrongly saying that another program uses the port. The real error is written to the log.
+- Opening WinAirdrop while another copy is still starting now waits a few seconds for it instead of showing an error.
+
 ## [1.0.2] - 2026-10-15
 
 ### Added
@@ -48,7 +54,8 @@ First public release.
 - Settings page restricted to loopback, with Host-header validation (DNS-rebinding protection), anti-CSRF tokens and security headers.
 - Firewall rules limited to the Private network profile; networks are trusted one by one, never in bulk.
 
-[Unreleased]: https://github.com/josedag31/WinAirdrop/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/josedag31/WinAirdrop/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/josedag31/WinAirdrop/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/josedag31/WinAirdrop/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/josedag31/WinAirdrop/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/josedag31/WinAirdrop/releases/tag/v1.0.0

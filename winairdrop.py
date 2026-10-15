@@ -36,7 +36,7 @@ from dotenv import load_dotenv, set_key
 from zeroconf import IPVersion, ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 FROZEN = getattr(sys, "frozen", False)  # PyInstaller .exe
 if FROZEN:
@@ -994,30 +994,50 @@ def running_instance() -> bool:
         return False
 
 
-async def start_server(runner: web.AppRunner) -> bool:
+PORT_IN_USE_ERRORS = {98, 10048}  # EADDRINUSE (POSIX), WSAEADDRINUSE (Windows)
+
+
+async def start_server(runner: web.AppRunner) -> OSError | None:
+    """Start listening. Returns None on success, or the last error."""
     # After a restart the old process may still hold the port for a moment.
     attempts = 40 if os.getenv("WINAIRDROP_RELAUNCH") else 1
+    error = None
     for attempt in range(attempts):
         try:
             await web.TCPSite(runner, "0.0.0.0", PORT).start()
-            return True
-        except OSError:
+            return None
+        except OSError as e:
+            error = e
             if attempt + 1 < attempts:
                 await asyncio.sleep(0.25)
-    return False
+    return error
+
+
+def port_in_use(error: OSError) -> bool:
+    return error.errno in PORT_IN_USE_ERRORS or getattr(error, "winerror", None) in PORT_IN_USE_ERRORS
 
 
 async def main() -> int:
     runner = web.AppRunner(create_app(), access_log=None)
     await runner.setup()
-    if not await start_server(runner):
+    error = await start_server(runner)
+    if error is not None:
         await runner.cleanup()
-        if running_instance():
-            # Already running: opening WinAirdrop again just shows the settings.
-            webbrowser.open(setup_url())
-            return 0
-        log(f"Port {PORT} is used by another program. Change WINAIRDROP_PORT in {ENV_FILE}.")
-        message_box(t("port_busy_title"), t("port_busy_text", port=PORT))
+        if port_in_use(error):
+            # A copy that is still starting can take a few seconds to answer.
+            for _ in range(5):
+                if await asyncio.to_thread(running_instance):
+                    # Already running: opening WinAirdrop again just shows the settings.
+                    webbrowser.open(setup_url())
+                    return 0
+                await asyncio.sleep(1)
+            log(f"Port {PORT} is used by another program ({error}). Change WINAIRDROP_PORT in {ENV_FILE}.")
+            message_box(t("port_busy_title"), t("port_busy_text", port=PORT))
+        else:
+            # Not "in use": something refused the connection, typically an
+            # antivirus running WinAirdrop in its sandbox (Avast CyberCapture).
+            log(f"Could not listen on port {PORT}: {error}")
+            message_box(t("port_blocked_title"), t("port_blocked_text", port=PORT))
         return 1
     log(f"WinAirdrop {__version__} listening on port {PORT}. Files -> {FOLDER}")
     log(f"Settings: {setup_url()}")
